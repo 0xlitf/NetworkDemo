@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/Network">
+        <file>Network/NetworkClient.qml</file>
+        <file>Network/qmldir</file>
+    </qresource>
+</RCC>
