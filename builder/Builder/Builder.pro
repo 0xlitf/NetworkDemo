@@ -1,5 +1,5 @@
 
-QT       += core
+QT       += core qml
 
 TEMPLATE = lib
 
@@ -16,4 +16,4 @@ CONFIG( release, debug | release ) {
 NETWORK_COMPILE_MODE = SRC
 include( $$PWD/../../src/Network.pri )
 
-DESTDIR = $$JQNETWORK_BIN_DIR
+DESTDIR = $$NETWORK_BIN_DIR
