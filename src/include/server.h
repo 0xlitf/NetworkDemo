@@ -39,25 +39,25 @@ public:
 		const bool &fileTransferEnabled = false);
 	inline QSharedPointer<ServerSettings> serverSettings()
 	{
-		return serverSettings_;
+		return m_serverSettings;
 	}
 	inline QSharedPointer<ConnectPoolSettings> connectPoolSettings()
 	{
-		return connectPoolSettings_;
+		return m_connectPoolSettings;
 	}
 	inline QSharedPointer<ConnectSettings> connectSettings()
 	{
-		return connectSettings_;
+		return m_connectSettings;
 	}
 	inline QString nodeMarkSummary() const
 	{
-		return nodeMarkSummary_;
+		return m_nodeMarkSummary;
 	}
 	bool begin();
 	void registerProcessor(const QPointer<Processor> &processor);
 	inline QSet<QString> availableProcessorMethodNames() const
 	{
-		auto l = processorCallbacks_.keys();
+		auto l = m_processorCallbacks.keys();
 		return QSet<QString>(l.begin(), l.end());
 	}
 
@@ -66,13 +66,13 @@ private:
 	inline void onConnectToHostError(const QPointer<Connect> &connect,
 									 const QPointer<ConnectPool> &connectPool)
 	{
-		if (!serverSettings_->connectToHostErrorCallback)
+		if (!m_serverSettings->connectToHostErrorCallback)
 		{
 			return;
 		}
-		callbackThreadPool_->run(
+		m_callbackThreadPool->run(
 			[connect,
-			 callback = serverSettings_->connectToHostErrorCallback]()
+			 callback = m_serverSettings->connectToHostErrorCallback]()
 			{
 				callback(connect);
 			});
@@ -80,13 +80,13 @@ private:
 	inline void onConnectToHostTimeout(const QPointer<Connect> &connect,
 									   const QPointer<ConnectPool> &connectPool)
 	{
-		if (!serverSettings_->connectToHostTimeoutCallback)
+		if (!m_serverSettings->connectToHostTimeoutCallback)
 		{
 			return;
 		}
-		callbackThreadPool_->run(
+		m_callbackThreadPool->run(
 			[connect,
-			 callback = serverSettings_->connectToHostTimeoutCallback]()
+			 callback = m_serverSettings->connectToHostTimeoutCallback]()
 			{
 				callback(connect);
 			});
@@ -94,13 +94,13 @@ private:
 	inline void onConnectToHostSucceed(const QPointer<Connect> &connect,
 									   const QPointer<ConnectPool> &connectPool)
 	{
-		if (!serverSettings_->connectToHostSucceedCallback)
+		if (!m_serverSettings->connectToHostSucceedCallback)
 		{
 			return;
 		}
-		callbackThreadPool_->run(
+		m_callbackThreadPool->run(
 			[connect,
-			 callback = serverSettings_->connectToHostSucceedCallback]()
+			 callback = m_serverSettings->connectToHostSucceedCallback]()
 			{
 				callback(connect);
 			});
@@ -108,26 +108,26 @@ private:
 	inline void onRemoteHostClosed(const QPointer<Connect> &connect,
 								   const QPointer<ConnectPool> &connectPool)
 	{
-		if (!serverSettings_->remoteHostClosedCallback)
+		if (!m_serverSettings->remoteHostClosedCallback)
 		{
 			return;
 		}
-		callbackThreadPool_->run(
+		m_callbackThreadPool->run(
 			[connect,
-			 callback = serverSettings_->remoteHostClosedCallback]()
+			 callback = m_serverSettings->remoteHostClosedCallback]()
 			{
 				callback(connect);
 			});
 	}
 	inline void onReadyToDelete(const QPointer<Connect> &connect, const QPointer<ConnectPool> &connectPool)
 	{
-		if (!serverSettings_->readyToDeleteCallback)
+		if (!m_serverSettings->readyToDeleteCallback)
 		{
 			return;
 		}
-		callbackThreadPool_->run(
+		m_callbackThreadPool->run(
 			[connect,
-			 callback = serverSettings_->readyToDeleteCallback]()
+			 callback = m_serverSettings->readyToDeleteCallback]()
 			{
 				callback(connect);
 			});
@@ -140,13 +140,13 @@ private:
 		const qint64 &payloadCurrentSize,
 		const qint64 &payloadTotalSize)
 	{
-		if (!serverSettings_->packageSendingCallback)
+		if (!m_serverSettings->packageSendingCallback)
 		{
 			return;
 		}
-		callbackThreadPool_->run(
+		m_callbackThreadPool->run(
 			[connect,
-			 callback = serverSettings_->packageSendingCallback,
+			 callback = m_serverSettings->packageSendingCallback,
 			 randomFlag,
 			 payloadCurrentIndex,
 			 payloadCurrentSize,
@@ -164,11 +164,11 @@ private:
         const qint64& payloadTotalSize
         )
     {
-        if (!serverSettings_->packageReceivingCallback) { return; }
-        callbackThreadPool_->run(
+        if (!m_serverSettings->packageReceivingCallback) { return; }
+        m_callbackThreadPool->run(
             [
                 connect,
-                callback = serverSettings_->packageReceivingCallback,
+                callback = m_serverSettings->packageReceivingCallback,
                 randomFlag,
                 payloadCurrentIndex,
                 payloadCurrentSize,
@@ -186,25 +186,25 @@ private:
 
 private:
 	// Thread pool
-	static QWeakPointer<NetworkThreadPool> globalServerThreadPool_;
-	QSharedPointer<NetworkThreadPool> serverThreadPool_;
-	static QWeakPointer<NetworkThreadPool> globalSocketThreadPool_;
-	QSharedPointer<NetworkThreadPool> socketThreadPool_;
-	static QWeakPointer<NetworkThreadPool> globalCallbackThreadPool_;
-	QSharedPointer<NetworkThreadPool> callbackThreadPool_;
+	static QWeakPointer<NetworkThreadPool> m_globalServerThreadPool;
+	QSharedPointer<NetworkThreadPool> m_serverThreadPool;
+	static QWeakPointer<NetworkThreadPool> m_globalSocketThreadPool;
+	QSharedPointer<NetworkThreadPool> m_socketThreadPool;
+	static QWeakPointer<NetworkThreadPool> m_globalCallbackThreadPool;
+	QSharedPointer<NetworkThreadPool> m_callbackThreadPool;
 	// Settings
-	QSharedPointer<ServerSettings> serverSettings_;
-	QSharedPointer<ConnectPoolSettings> connectPoolSettings_;
-	QSharedPointer<ConnectSettings> connectSettings_;
+	QSharedPointer<ServerSettings> m_serverSettings;
+	QSharedPointer<ConnectPoolSettings> m_connectPoolSettings;
+	QSharedPointer<ConnectSettings> m_connectSettings;
 	// Server
-	QSharedPointer<QTcpServer> tcpServer_;
-	QMap<QThread *, QSharedPointer<ConnectPool>> connectPools_;
+	QSharedPointer<QTcpServer> m_tcpServer;
+	QMap<QThread *, QSharedPointer<ConnectPool>> m_connectPools;
 	// Processor
-	QSet<Processor *> processors_;
+	QSet<Processor *> m_processors;
 	QMap<QString, std::function<void(const QPointer<Connect> &, const QSharedPointer<Package> &)>>
-		processorCallbacks_;
+		m_processorCallbacks;
 	// Other
-	QString nodeMarkSummary_;
+	QString m_nodeMarkSummary;
 };
 
 #endif // NETWORK_INCLUDE_NETWORK_SERVER_H_

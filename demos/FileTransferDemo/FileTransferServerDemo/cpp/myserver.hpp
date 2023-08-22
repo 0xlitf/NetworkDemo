@@ -15,14 +15,14 @@ public:
 	~MyServer() override = default;
 	bool begin() {
 		// 创建一个服务端
-		server_ = Server::createServer(26432, QHostAddress::Any, true);
+		m_server = Server::createServer(26432, QHostAddress::Any, true);
 		// 注册当前类
-		server_->registerProcessor(this);
+		m_server->registerProcessor(this);
 		// 设置文件保存到桌面
-		server_->connectSettings()->setFilePathProviderToDir(
+		m_server->connectSettings()->setFilePathProviderToDir(
 			QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
 		// 初始化服务端
-		if (!server_->begin()) {
+		if (!m_server->begin()) {
 			qDebug() << "MyServer: begin fail";
 			return false;
 		}
@@ -40,6 +40,6 @@ public slots:
 		send["message"] = "";
 	}
 private:
-	QSharedPointer<Server> server_;
+	QSharedPointer<Server> m_server;
 };
 #endif//__CPP_MYSERVER_HPP__
