@@ -1,14 +1,3 @@
-/*
-	This file is part of Network
-
-	Library introduce: https://github.com/188080501/Network
-
-	Copyright: Jason
-
-	Contact email: Jason@JasonServer.com
-
-	GitHub: https://github.com/188080501/
-*/
 
 #ifndef NETWORK_INCLUDE_NETWORK_FOUNDATION_H_
 #define NETWORK_INCLUDE_NETWORK_FOUNDATION_H_
@@ -17,7 +6,6 @@
 #include <functional>
 #include <vector>
 #include <memory>
-
 
 #include <QObject>
 #include <QSharedPointer>

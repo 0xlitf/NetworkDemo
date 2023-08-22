@@ -10,26 +10,32 @@
 #include "connectpool.h"
 #include "connect.h"
 #include "processor.h"
+
 using namespace std;
 using namespace std::placeholders;
+
 // ServerHelper
 class ServerHelper : public QTcpServer {
 public:
 	ServerHelper(const std::function<void(qintptr socketDescriptor)>& onIncomingConnectionCallback) :
-		onIncomingConnectionCallback_(onIncomingConnectionCallback) {
+		m_onIncomingConnectionCallback(onIncomingConnectionCallback) {
 	}
 	~ServerHelper() override = default;
+
 private:
 	void incomingConnection(qintptr socketDescriptor) override {
-		onIncomingConnectionCallback_(socketDescriptor);
+		m_onIncomingConnectionCallback(socketDescriptor);
 	}
+
 private:
-	std::function<void(qintptr socketDescriptor)> onIncomingConnectionCallback_;
+	std::function<void(qintptr socketDescriptor)> m_onIncomingConnectionCallback;
 };
+
 // Server
 QWeakPointer<NetworkThreadPool> Server::m_globalServerThreadPool;
 QWeakPointer<NetworkThreadPool> Server::m_globalSocketThreadPool;
 QWeakPointer<NetworkThreadPool> Server::m_globalCallbackThreadPool;
+
 Server::Server(
 	const QSharedPointer<ServerSettings> serverSettings,
 	const QSharedPointer<ConnectPoolSettings> connectPoolSettings,
@@ -39,6 +45,7 @@ Server::Server(
 	m_connectPoolSettings(connectPoolSettings),
 	m_connectSettings(connectSettings) {
 }
+
 Server::~Server() {
 	if (!this->m_tcpServer) {
 		return;
@@ -50,49 +57,53 @@ Server::~Server() {
 			m_tcpServer->close();
 			m_tcpServer.clear();
 		}
-	);
+			);
 	m_socketThreadPool->waitRunEach(
 		[&]() {
 			m_connectPools[QThread::currentThread()].clear();
 		}
 	);
 }
-QSharedPointer<Server> Server::createServer(
-	const quint16& listenPort,
-	const QHostAddress& listenAddress,
-	const bool& fileTransferEnabled
-) {
+
+QSharedPointer<Server> Server::createServer(const quint16& listenPort, const QHostAddress& listenAddress, const bool& fileTransferEnabled) {
 	QSharedPointer<ServerSettings> serverSettings(new ServerSettings);
 	QSharedPointer<ConnectPoolSettings> connectPoolSettings(new ConnectPoolSettings);
 	QSharedPointer<ConnectSettings> connectSettings(new ConnectSettings);
+
 	serverSettings->listenAddress = listenAddress;
 	serverSettings->listenPort = listenPort;
+
 	if (fileTransferEnabled) {
 		connectSettings->fileTransferEnabled = true;
 		connectSettings->setFilePathProviderToDefaultDir();
 	}
+
 	return QSharedPointer<Server>(new Server(serverSettings, connectPoolSettings, connectSettings));
 }
+
 bool Server::begin() {
 	NETWORK_THISNULL_CHECK("Server::begin", false);
 	m_nodeMarkSummary = NetworkNodeMark::calculateNodeMarkSummary(m_serverSettings->dutyMark);
 	if (m_globalServerThreadPool) {
 		m_serverThreadPool = m_globalServerThreadPool.toStrongRef();
-	} else {
+	}
+	else {
 		m_serverThreadPool = QSharedPointer<NetworkThreadPool>(
 			new NetworkThreadPool(m_serverSettings->globalServerThreadCount));
 		m_globalServerThreadPool = m_serverThreadPool.toWeakRef();
 	}
 	if (m_globalSocketThreadPool) {
 		m_socketThreadPool = m_globalSocketThreadPool.toStrongRef();
-	} else {
+	}
+	else {
 		m_socketThreadPool = QSharedPointer<NetworkThreadPool>(
 			new NetworkThreadPool(m_serverSettings->globalSocketThreadCount));
 		m_globalSocketThreadPool = m_socketThreadPool.toWeakRef();
 	}
 	if (m_globalCallbackThreadPool) {
 		m_callbackThreadPool = m_globalCallbackThreadPool.toStrongRef();
-	} else {
+	}
+	else {
 		m_callbackThreadPool = QSharedPointer<NetworkThreadPool>(
 			new NetworkThreadPool(m_serverSettings->globalCallbackThreadCount));
 		m_globalCallbackThreadPool = m_callbackThreadPool.toWeakRef();
@@ -110,7 +121,7 @@ bool Server::begin() {
 	m_serverThreadPool->waitRun(
 		[
 			this,
-			&listenSucceed
+				&listenSucceed
 		]() {
 			this->m_tcpServer = QSharedPointer<QTcpServer>(new ServerHelper([this](auto socketDescriptor) {
 				this->incomingConnection(socketDescriptor);
@@ -120,7 +131,7 @@ bool Server::begin() {
 				this->m_serverSettings->listenPort
 			);
 		}
-	);
+			);
 	if (!listenSucceed) {
 		return false;
 	}
@@ -154,7 +165,7 @@ bool Server::begin() {
 				)
 			);
 		}
-	);
+			);
 	return true;
 }
 void Server::registerProcessor(const QPointer<Processor>& processor) {
@@ -177,7 +188,7 @@ void Server::registerProcessor(const QPointer<Processor>& processor) {
 					return;
 				}
 				processor->handlePackage(connect, package);
-		};
+			};
 		m_processorCallbacks[currentSlot] = callback;
 		++counter;
 	}
@@ -192,23 +203,23 @@ void Server::incomingConnection(const qintptr& socketDescriptor) {
 	auto runOnConnectThreadCallback =
 		[
 			this,
-			rotaryIndex
+				rotaryIndex
 		](const std::function<void()>& callback) {
 		this->m_socketThreadPool->run(callback, rotaryIndex);
-	};
-	m_socketThreadPool->run(
-		[
-			this,
-			runOnConnectThreadCallback,
-			socketDescriptor
-		]() {
-			this->m_connectPools[QThread::currentThread()]->createConnect(
-				runOnConnectThreadCallback,
-				socketDescriptor
-			);
-		},
-		rotaryIndex
-	);
+		};
+			m_socketThreadPool->run(
+				[
+					this,
+						runOnConnectThreadCallback,
+						socketDescriptor
+				]() {
+					this->m_connectPools[QThread::currentThread()]->createConnect(
+						runOnConnectThreadCallback,
+						socketDescriptor
+					);
+				},
+						rotaryIndex
+						);
 }
 void Server::onPackageReceived(
 	const QPointer<Connect>& connect,
@@ -220,13 +231,14 @@ void Server::onPackageReceived(
 		m_callbackThreadPool->run(
 			[
 				connect,
-				package,
-				callback = m_serverSettings->packageReceivedCallback
+					package,
+					callback = m_serverSettings->packageReceivedCallback
 			]() {
 				callback(connect, package);
 			}
-		);
-	} else {
+				);
+	}
+	else {
 		if (package->targetActionFlag().isEmpty()) {
 			qDebug() <<
 				"Server::onPackageReceived: processor is enable, but package targetActionFlag is empty";
@@ -242,11 +254,11 @@ void Server::onPackageReceived(
 		m_callbackThreadPool->run(
 			[
 				connect,
-				package,
-				callback = *it
+					package,
+					callback = *it
 			]() {
 				callback(connect, package);
 			}
-		);
+				);
 	}
 }
