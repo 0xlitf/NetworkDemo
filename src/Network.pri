@@ -56,21 +56,13 @@ NETWORK_LIB_FILEPATH = $$NETWORK_BIN_DIR/$$NETWORK_LIB_FILENAME
 equals(NETWORK_COMPILE_MODE,SRC) {
     HEADERS *= \
         $$PWD/include/foundation.h \
-        $$PWD/include/foundation.inc \
         $$PWD/include/package.h \
-        $$PWD/include/package.inc \
         $$PWD/include/connect.h \
-        $$PWD/include/connect.inc \
         $$PWD/include/connectpool.h \
-        $$PWD/include/connectpool.inc \
         $$PWD/include/server.h \
-        $$PWD/include/server.inc \
         $$PWD/include/processor.h \
-        $$PWD/include/processor.inc \
         $$PWD/include/client.h \
-        $$PWD/include/client.inc \
-        $$PWD/include/lan.h \
-        $$PWD/include/lan.inc
+        $$PWD/include/lan.h
     SOURCES *= \
         $$PWD/src/foundation.cpp \
         $$PWD/src/package.cpp \
@@ -90,8 +82,7 @@ else {
 # 如果开启了qml模块，那么引入Network的qml扩展部分
 contains( QT, qml ) {
     HEADERS *= \
-        $$PWD/include/clientforqml.h \
-        $$PWD/include/clientforqml.inc
+        $$PWD/include/clientforqml.h
     SOURCES *= \
         $$PWD/src/clientforqml.cpp
     RESOURCES *= \
