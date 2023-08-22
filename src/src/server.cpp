@@ -84,61 +84,54 @@ QSharedPointer<Server> Server::createServer(const quint16& listenPort, const QHo
 bool Server::begin() {
 	NETWORK_THISNULL_CHECK("Server::begin", false);
 	m_nodeMarkSummary = NetworkNodeMark::calculateNodeMarkSummary(m_serverSettings->dutyMark);
+
 	if (m_globalServerThreadPool) {
 		m_serverThreadPool = m_globalServerThreadPool.toStrongRef();
-	}
-	else {
-		m_serverThreadPool = QSharedPointer<NetworkThreadPool>(
-			new NetworkThreadPool(m_serverSettings->globalServerThreadCount));
+	} else {
+		m_serverThreadPool = QSharedPointer<NetworkThreadPool>(new NetworkThreadPool(m_serverSettings->globalServerThreadCount));
 		m_globalServerThreadPool = m_serverThreadPool.toWeakRef();
 	}
+
 	if (m_globalSocketThreadPool) {
 		m_socketThreadPool = m_globalSocketThreadPool.toStrongRef();
-	}
-	else {
-		m_socketThreadPool = QSharedPointer<NetworkThreadPool>(
-			new NetworkThreadPool(m_serverSettings->globalSocketThreadCount));
+	} else {
+		m_socketThreadPool = QSharedPointer<NetworkThreadPool>(new NetworkThreadPool(m_serverSettings->globalSocketThreadCount));
 		m_globalSocketThreadPool = m_socketThreadPool.toWeakRef();
 	}
+
 	if (m_globalCallbackThreadPool) {
 		m_callbackThreadPool = m_globalCallbackThreadPool.toStrongRef();
-	}
-	else {
-		m_callbackThreadPool = QSharedPointer<NetworkThreadPool>(
-			new NetworkThreadPool(m_serverSettings->globalCallbackThreadCount));
+	} else {
+		m_callbackThreadPool = QSharedPointer<NetworkThreadPool>(new NetworkThreadPool(m_serverSettings->globalCallbackThreadCount));
 		m_globalCallbackThreadPool = m_callbackThreadPool.toWeakRef();
 	}
+
 	if (!m_processors.isEmpty()) {
 		QSet<QThread*> receivedPossibleThreads;
 		m_callbackThreadPool->waitRunEach([&receivedPossibleThreads]() {
 			receivedPossibleThreads.insert(QThread::currentThread());
 			});
+
 		for (const auto& processor : m_processors) {
 			processor->setReceivedPossibleThreads(receivedPossibleThreads);
 		}
 	}
+
 	bool listenSucceed = false;
 	m_serverThreadPool->waitRun(
-		[
-			this,
-				&listenSucceed
-		]() {
+		[this, &listenSucceed]() {
 			this->m_tcpServer = QSharedPointer<QTcpServer>(new ServerHelper([this](auto socketDescriptor) {
 				this->incomingConnection(socketDescriptor);
 				}));
-			listenSucceed = this->m_tcpServer->listen(
-				this->m_serverSettings->listenAddress,
-				this->m_serverSettings->listenPort
-			);
-		}
-			);
+			listenSucceed = this->m_tcpServer->listen(this->m_serverSettings->listenAddress, this->m_serverSettings->listenPort);
+		});
+
 	if (!listenSucceed) {
 		return false;
 	}
+
 	m_socketThreadPool->waitRunEach(
-		[
-			this
-		]() {
+		[this]() {
 			QSharedPointer<ConnectPoolSettings> connectPoolSettings(
 				new ConnectPoolSettings(*this->m_connectPoolSettings));
 			QSharedPointer<ConnectSettings>
@@ -164,16 +157,17 @@ bool Server::begin() {
 					connectSettings
 				)
 			);
-		}
-			);
+		});
 	return true;
 }
+
 void Server::registerProcessor(const QPointer<Processor>& processor) {
 	NETWORK_THISNULL_CHECK("Server::registerProcessor");
 	if (m_tcpServer) {
 		qDebug() << "Server::registerProcessor: please use registerProcessor befor begin()";
 		return;
 	}
+
 	const auto&& availableSlots = processor->availableSlots();
 	auto counter = 0;
 	for (const auto& currentSlot : availableSlots) {
@@ -192,58 +186,44 @@ void Server::registerProcessor(const QPointer<Processor>& processor) {
 		m_processorCallbacks[currentSlot] = callback;
 		++counter;
 	}
+
 	m_processors.insert(processor);
 	if (!counter) {
 		qDebug() << "Server::registerProcessor: no available slots in processor:" << processor->metaObject()->
 			className();
 	}
 }
+
 void Server::incomingConnection(const qintptr& socketDescriptor) {
 	const auto&& rotaryIndex = m_socketThreadPool->nextRotaryIndex();
-	auto runOnConnectThreadCallback =
-		[
-			this,
-				rotaryIndex
-		](const std::function<void()>& callback) {
+	auto runOnConnectThreadCallback = [this, rotaryIndex](const std::function<void()>& callback) {
 		this->m_socketThreadPool->run(callback, rotaryIndex);
 		};
-			m_socketThreadPool->run(
-				[
-					this,
-						runOnConnectThreadCallback,
-						socketDescriptor
-				]() {
-					this->m_connectPools[QThread::currentThread()]->createConnect(
-						runOnConnectThreadCallback,
-						socketDescriptor
-					);
-				},
-						rotaryIndex
-						);
+	m_socketThreadPool->run(
+		[this, runOnConnectThreadCallback, socketDescriptor]() {
+			this->m_connectPools[QThread::currentThread()]->createConnect(
+				runOnConnectThreadCallback,
+				socketDescriptor
+			);
+		},
+		rotaryIndex
+	);
 }
-void Server::onPackageReceived(
-	const QPointer<Connect>& connect,
-	const QPointer<ConnectPool>&,
-	const QSharedPointer<Package>& package
-) {
+
+void Server::onPackageReceived(const QPointer<Connect>& connect, const QPointer<ConnectPool>&, const QSharedPointer<Package>& package) {
 	if (m_processorCallbacks.isEmpty()) {
 		NETWORK_NULLPTR_CHECK(m_serverSettings->packageReceivedCallback);
 		m_callbackThreadPool->run(
-			[
-				connect,
-					package,
-					callback = m_serverSettings->packageReceivedCallback
-			]() {
+			[connect, package, callback = m_serverSettings->packageReceivedCallback]() {
 				callback(connect, package);
-			}
-				);
-	}
-	else {
+			});
+	} else {
 		if (package->targetActionFlag().isEmpty()) {
 			qDebug() <<
 				"Server::onPackageReceived: processor is enable, but package targetActionFlag is empty";
 			return;
 		}
+
 		const auto&& it = m_processorCallbacks.find(package->targetActionFlag());
 		if (it == m_processorCallbacks.end()) {
 			qDebug() <<
@@ -251,14 +231,10 @@ void Server::onPackageReceived(
 				package->targetActionFlag();
 			return;
 		}
+
 		m_callbackThreadPool->run(
-			[
-				connect,
-					package,
-					callback = *it
-			]() {
+			[connect, package, callback = *it]() {
 				callback(connect, package);
-			}
-				);
+			});
 	}
 }

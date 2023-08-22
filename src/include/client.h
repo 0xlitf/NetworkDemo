@@ -8,63 +8,62 @@ struct ClientSettings {
 	QString dutyMark;
 	int maximumAutoConnectToHostWaitTime = 10 * 1000;
 	bool autoCreateConnect = true;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)>
-		connectToHostErrorCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)>
-		connectToHostTimeoutCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)>
-		connectToHostSucceedCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)>
-		remoteHostClosedCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)>
-		readyToDeleteCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port, const qint32&,
-		const qint64&, const qint64&, const qint64&)>
-		packageSendingCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port, const qint32&,
-		const qint64&, const qint64&, const qint64&)>
-		packageReceivingCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port,
-		const QSharedPointer<Package>&)>
-		packageReceivedCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)> connectToHostErrorCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)> connectToHostTimeoutCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)> connectToHostSucceedCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)> remoteHostClosedCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port)> readyToDeleteCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port, const qint32&, const qint64&, const qint64&, const qint64&)> packageSendingCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port, const qint32&, const qint64&, const qint64&, const qint64&)> packageReceivingCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QString& hostName, const quint16& port, const QSharedPointer<Package>&)> packageReceivedCallback = nullptr;
 	int globalSocketThreadCount = 1;
 	int globalCallbackThreadCount = NETWORK_ADVISE_THREADCOUNT;
 };
+
 class Client : public QObject {
-	Q_OBJECT
-		Q_DISABLE_COPY(Client)
+	Q_OBJECT;
+	Q_DISABLE_COPY(Client)
 public:
 	Client(
 		const QSharedPointer<ClientSettings>& clientSettings,
 		QSharedPointer<ConnectPoolSettings> connectPoolSettings,
 		QSharedPointer<ConnectSettings> connectSettings);
 	~Client() override;
-	static QSharedPointer<Client> createClient(
-		const bool& fileTransferEnabled = false);
+
+	static QSharedPointer<Client> createClient(const bool& fileTransferEnabled = false);
+
 	inline QSharedPointer<ClientSettings> clientSettings() {
 		return m_clientSettings;
 	}
+
 	inline QSharedPointer<ConnectPoolSettings> connectPoolSettings() {
 		return m_connectPoolSettings;
 	}
+
 	inline QSharedPointer<ConnectSettings> connectSettings() {
 		return m_connectSettings;
 	}
+
 	inline QString nodeMarkSummary() const {
 		return m_nodeMarkSummary;
 	}
+
 	bool begin();
+
 	void registerProcessor(const QPointer<Processor>& processor);
+
 	inline QSet<QString> availableProcessorMethodNames() const {
 		auto l = m_processorCallbacks.keys();
 		return QSet<QString>(l.begin(), l.end());
 	}
 
 	void createConnect(const QString& hostName, const quint16& port);
+
 	bool waitForCreateConnect(
 		const QString& hostName,
 		const quint16& port,
 		const int& maximumConnectToHostWaitTime = -1);
+
 	qint32 sendPayloadData(
 		const QString& hostName,
 		const quint16& port,
@@ -152,6 +151,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	qint32 sendFileData(
 		const QString& hostName,
 		const quint16& port,
@@ -177,6 +177,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	inline qint32 sendFileData(
 		const QString& hostName,
 		const quint16& port,
@@ -192,6 +193,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	qint32 waitForSendPayloadData(
 		const QString& hostName,
 		const quint16& port,
@@ -217,6 +219,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	inline qint32 waitForSendPayloadData(
 		const QString& hostName,
 		const quint16& port,
@@ -232,6 +235,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	qint32 waitForSendVariantMapData(
 		const QString& hostName,
 		const quint16& port,
@@ -257,6 +261,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	inline qint32 waitForSendVariantMapData(
 		const QString& hostName,
 		const quint16& port,
@@ -272,6 +277,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	qint32 waitForSendFileData(
 		const QString& hostName,
 		const quint16& port,
@@ -297,6 +303,7 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	inline qint32 waitForSendFileData(
 		const QString& hostName,
 		const quint16& port,
@@ -312,15 +319,22 @@ public:
 			succeedCallback,
 			failCallback);
 	}
+
 	QPointer<Connect> getConnect(const QString& hostName, const quint16& port);
+
 	bool containsConnect(const QString& hostName, const quint16& port);
 
 private:
 	void onConnectToHostError(const QPointer<Connect>& connect, const QPointer<ConnectPool>& connectPool);
+
 	void onConnectToHostTimeout(const QPointer<Connect>& connect, const QPointer<ConnectPool>& connectPool);
+
 	void onConnectToHostSucceed(const QPointer<Connect>& connect, const QPointer<ConnectPool>& connectPool);
+
 	void onRemoteHostClosed(const QPointer<Connect>& connect, const QPointer<ConnectPool>& connectPool);
+
 	void onReadyToDelete(const QPointer<Connect>& connect, const QPointer<ConnectPool>& connectPool);
+
 	void onPackageSending(
 		const QPointer<Connect>& connect,
 		const QPointer<ConnectPool>& connectPool,
@@ -328,6 +342,7 @@ private:
 		const qint64& payloadCurrentIndex,
 		const qint64& payloadCurrentSize,
 		const qint64& payloadTotalSize);
+
 	void onPackageReceiving(
 		const QPointer<Connect>& connect,
 		const QPointer<ConnectPool>& connectPool,
@@ -335,19 +350,23 @@ private:
 		const qint64& payloadCurrentIndex,
 		const qint64& payloadCurrentSize,
 		const qint64& payloadTotalSize);
+
 	void onPackageReceived(
 		const QPointer<Connect>& connect,
 		const QPointer<ConnectPool>& connectPool,
 		const QSharedPointer<Package>& package);
+
 	void onWaitReplySucceedPackage(
 		const QPointer<Connect>& connect,
 		const QPointer<ConnectPool>& connectPool,
 		const QSharedPointer<Package>& package,
 		const ConnectPointerAndPackageSharedPointerFunction& succeedCallback);
+
 	void onWaitReplyPackageFail(
 		const QPointer<Connect>& connect,
 		const QPointer<ConnectPool>& connectPool,
 		const ConnectPointerFunction& failCallback);
+
 	void releaseWaitConnectSucceedSemaphore(const QString& hostName, const quint16& port, const bool& succeed);
 
 private:

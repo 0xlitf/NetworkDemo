@@ -10,40 +10,44 @@
 #include <QtConcurrent>
 #include <QLocale>
 #include <QTime>
+
 // NetworkThreadPoolHelper
 NetworkThreadPoolHelper::NetworkThreadPoolHelper() :
-	waitForRunCallbacks_(new std::vector<std::function<void()>>) {
+	m_waitForRunCallbacks(new std::vector<std::function<void()>>) {
 }
+
 void NetworkThreadPoolHelper::run(const std::function<void()>& callback) {
-	mutex_.lock();
-	waitForRunCallbacks_->push_back(callback);
-	if (!alreadyCall_) {
-		alreadyCall_ = true;
+	m_mutex.lock();
+	m_waitForRunCallbacks->push_back(callback);
+	if (!m_alreadyCall) {
+		m_alreadyCall = true;
 		QMetaObject::invokeMethod(
 			this,
 			"onRun",
 			Qt::QueuedConnection
 		);
 	}
-	mutex_.unlock();
+	m_mutex.unlock();
 }
+
 void NetworkThreadPoolHelper::onRun() {
 	auto currentTime = QDateTime::currentMSecsSinceEpoch();
-	if (((currentTime - lastRunTime_) < 5) && (lastRunCallbackCount_ > 10)) {
+	if (((currentTime - m_lastRunTime) < 5) && (m_lastRunCallbackCount > 10)) {
 		QThread::msleep(5);
 	}
 	std::vector<std::function<void()>> callbacks;
-	mutex_.lock();
-	callbacks = *waitForRunCallbacks_;
-	waitForRunCallbacks_->clear();
-	alreadyCall_ = false;
-	lastRunTime_ = currentTime;
-	lastRunCallbackCount_ = static_cast<int>(callbacks.size());
-	mutex_.unlock();
+	m_mutex.lock();
+	callbacks = *m_waitForRunCallbacks;
+	m_waitForRunCallbacks->clear();
+	m_alreadyCall = false;
+	m_lastRunTime = currentTime;
+	m_lastRunCallbackCount = static_cast<int>(callbacks.size());
+	m_mutex.unlock();
 	for (const auto& callback : callbacks) {
 		callback();
 	}
 }
+
 // NetworkThreadPool
 NetworkThreadPool::NetworkThreadPool(const int& threadCount) :
 	threadPool_(new QThreadPool),
@@ -72,12 +76,14 @@ NetworkThreadPool::NetworkThreadPool(const int& threadCount) :
 	}
 	semaphoreForThreadStart.acquire(threadCount);
 }
+
 NetworkThreadPool::~NetworkThreadPool() {
 	for (const auto& eventLoop : *eventLoops_) {
 		QMetaObject::invokeMethod(eventLoop.data(), "quit");
 	}
 	threadPool_->waitForDone();
 }
+
 int NetworkThreadPool::run(const std::function<void()>& callback, const int& threadIndex) {
 	if (threadIndex == -1) {
 		rotaryIndex_ = (rotaryIndex_ + 1) % helpers_->size();
@@ -86,6 +92,7 @@ int NetworkThreadPool::run(const std::function<void()>& callback, const int& thr
 	(*helpers_)[index]->run(callback);
 	return index;
 }
+
 int NetworkThreadPool::waitRun(const std::function<void()>& callback, const int& threadIndex) {
 	QSemaphore semaphore;
 	auto index = this->run(
@@ -101,34 +108,38 @@ int NetworkThreadPool::waitRun(const std::function<void()>& callback, const int&
 	semaphore.acquire(1);
 	return index;
 }
+
 // NetworkNodeMark
-qint64 NetworkNodeMark::applicationStartTime_ = QDateTime::currentMSecsSinceEpoch();
-QString NetworkNodeMark::applicationFilePath_;
-QString NetworkNodeMark::localHostName_;
+qint64 NetworkNodeMark::m_applicationStartTime = QDateTime::currentMSecsSinceEpoch();
+QString NetworkNodeMark::m_applicationFilePath;
+QString NetworkNodeMark::m_localHostName;
+
 NetworkNodeMark::NetworkNodeMark(const QString& dutyMark) :
-	nodeMarkCreatedTime_(QDateTime::currentMSecsSinceEpoch()),
-	nodeMarkClassAddress_(QString::number(reinterpret_cast<qint64>(this), 16)),
-	dutyMark_(dutyMark) {
-	if (applicationFilePath_.isEmpty()) {
-		applicationFilePath_ = qApp->applicationFilePath();
-		localHostName_ = QHostInfo::localHostName();
+	m_nodeMarkCreatedTime(QDateTime::currentMSecsSinceEpoch()),
+	m_nodeMarkClassAddress(QString::number(reinterpret_cast<qint64>(this), 16)),
+	m_dutyMark(dutyMark) {
+	if (m_applicationFilePath.isEmpty()) {
+		m_applicationFilePath = qApp->applicationFilePath();
+		m_localHostName = QHostInfo::localHostName();
 	}
-	nodeMarkSummary_ = QCryptographicHash::hash(
+	m_nodeMarkSummary = QCryptographicHash::hash(
 		QString("%1:%2:%3:%4:%5:%6").arg(
-			QString::number(applicationStartTime_),
-			applicationFilePath_,
-			localHostName_,
-			QString::number(nodeMarkCreatedTime_),
-			nodeMarkClassAddress_,
-			dutyMark_
+			QString::number(m_applicationStartTime),
+			m_applicationFilePath,
+			m_localHostName,
+			QString::number(m_nodeMarkCreatedTime),
+			m_nodeMarkClassAddress,
+			m_dutyMark
 		).toUtf8(),
 		QCryptographicHash::Md5
 	).toHex();
 }
+
 QString NetworkNodeMark::calculateNodeMarkSummary(const QString& dutyMark) {
 	NetworkNodeMark nodeMark(dutyMark);
 	return nodeMark.nodeMarkSummary();
 }
+
 // Network
 void Network::printVersionInformation(const char* NetworkCompileModeString) {
 	qDebug() << "Network library version:" << NETWORK_VERSIONNUMBER.toString().toLatin1().data()

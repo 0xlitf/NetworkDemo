@@ -12,10 +12,13 @@
 #include "connect.h"
 #include "package.h"
 #include "processor.h"
+
 using namespace std;
 using namespace std::placeholders;
+
 QWeakPointer<NetworkThreadPool> Client::m_globalSocketThreadPool;
 QWeakPointer<NetworkThreadPool> Client::m_globalCallbackThreadPool;
+
 Client::Client(
 	const QSharedPointer<ClientSettings>& clientSettings,
 	const QSharedPointer<ConnectPoolSettings> connectPoolSettings,
@@ -23,77 +26,61 @@ Client::Client(
 ) :
 	m_clientSettings(clientSettings),
 	m_connectPoolSettings(connectPoolSettings),
-	m_connectSettings(connectSettings)
-{
+	m_connectSettings(connectSettings) {
 }
-Client::~Client()
-{
-	if (!m_socketThreadPool)
-	{
+
+Client::~Client() {
+	if (!m_socketThreadPool) {
 		return;
 	}
 	m_socketThreadPool->waitRunEach(
-		[this]()
-		{
+		[this]() {
 			this->m_connectPools[QThread::currentThread()].clear();
 		}
 	);
 }
-QSharedPointer<Client> Client::createClient(
-	const bool& fileTransferEnabled
-)
-{
+
+QSharedPointer<Client> Client::createClient(const bool& fileTransferEnabled) {
 	QSharedPointer<ClientSettings> clientSettings(new ClientSettings);
 	QSharedPointer<ConnectPoolSettings> connectPoolSettings(new ConnectPoolSettings);
 	QSharedPointer<ConnectSettings> connectSettings(new ConnectSettings);
-	if (fileTransferEnabled)
-	{
+	if (fileTransferEnabled) {
 		connectSettings->fileTransferEnabled = true;
 		connectSettings->setFilePathProviderToDefaultDir();
 	}
 	return QSharedPointer<Client>(new Client(clientSettings, connectPoolSettings, connectSettings));
 }
-bool Client::begin()
-{
+
+bool Client::begin() {
 	NETWORK_THISNULL_CHECK("Client::begin", false);
 	m_nodeMarkSummary = NetworkNodeMark::calculateNodeMarkSummary(m_clientSettings->dutyMark);
-	if (m_globalSocketThreadPool)
-	{
+	if (m_globalSocketThreadPool) {
 		m_socketThreadPool = m_globalSocketThreadPool.toStrongRef();
-	}
-	else
-	{
+	} else {
 		m_socketThreadPool = QSharedPointer<NetworkThreadPool>(
 			new NetworkThreadPool(m_clientSettings->globalSocketThreadCount));
 		m_globalSocketThreadPool = m_socketThreadPool.toWeakRef();
 	}
-	if (m_globalCallbackThreadPool)
-	{
+	if (m_globalCallbackThreadPool) {
 		m_callbackThreadPool = m_globalCallbackThreadPool.toStrongRef();
-	}
-	else
-	{
+	} else {
 		m_callbackThreadPool = QSharedPointer<NetworkThreadPool>(
 			new NetworkThreadPool(m_clientSettings->globalCallbackThreadCount));
 		m_globalCallbackThreadPool = m_callbackThreadPool.toWeakRef();
 	}
-	if (!m_processors.isEmpty())
-	{
+	if (!m_processors.isEmpty()) {
 		QSet<QThread*> receivedPossibleThreads;
-		m_callbackThreadPool->waitRunEach([&receivedPossibleThreads]()
-		{
+		m_callbackThreadPool->waitRunEach([&receivedPossibleThreads]() {
 			receivedPossibleThreads.insert(QThread::currentThread());
-		});
-		for (const auto& processor : m_processors)
-		{
+			});
+		for (const auto& processor : m_processors) {
 			processor->setReceivedPossibleThreads(receivedPossibleThreads);
 		}
 	}
 	m_socketThreadPool->waitRunEach(
 		[
 			this
-		]()
-		{
+		]() {
 			QSharedPointer<ConnectPoolSettings> connectPoolSettings(
 				new ConnectPoolSettings(*this->m_connectPoolSettings)
 			);
@@ -103,20 +90,20 @@ bool Client::begin()
 			connectPoolSettings->connectToHostErrorCallback =
 				bind(&Client::onConnectToHostError, this, _1, _2);
 			connectPoolSettings->connectToHostTimeoutCallback = bind(&Client::onConnectToHostTimeout, this, _1,
-			                                                         _2);
+				_2);
 			connectPoolSettings->connectToHostSucceedCallback = bind(&Client::onConnectToHostSucceed, this, _1,
-			                                                         _2);
+				_2);
 			connectPoolSettings->remoteHostClosedCallback = bind(&Client::onRemoteHostClosed, this, _1, _2);
 			connectPoolSettings->readyToDeleteCallback = bind(&Client::onReadyToDelete, this, _1, _2);
 			connectPoolSettings->packageSendingCallback = bind(&Client::onPackageSending, this, _1, _2, _3, _4,
-			                                                   _5, _6);
+				_5, _6);
 			connectPoolSettings->packageReceivingCallback = bind(&Client::onPackageReceiving, this, _1, _2, _3,
-			                                                     _4, _5, _6);
+				_4, _5, _6);
 			connectPoolSettings->packageReceivedCallback = bind(&Client::onPackageReceived, this, _1, _2, _3);
 			connectPoolSettings->waitReplyPackageSucceedCallback = bind(&Client::onWaitReplySucceedPackage,
-			                                                            this, _1, _2, _3, _4);
+				this, _1, _2, _3, _4);
 			connectPoolSettings->waitReplyPackageFailCallback = bind(&Client::onWaitReplyPackageFail, this, _1,
-			                                                         _2, _3);
+				_2, _3);
 			connectSettings->randomFlagRangeStart = 1;
 			connectSettings->randomFlagRangeEnd = 999999999;
 			m_connectPools[QThread::currentThread()] = QSharedPointer<ConnectPool>(
@@ -126,51 +113,44 @@ bool Client::begin()
 				)
 			);
 		}
-	);
+			);
 	return true;
 }
-void Client::registerProcessor(const QPointer<Processor>& processor)
-{
+
+void Client::registerProcessor(const QPointer<Processor>& processor) {
 	NETWORK_THISNULL_CHECK("Client::registerProcessor");
-	if (!m_connectPools.isEmpty())
-	{
+	if (!m_connectPools.isEmpty()) {
 		qDebug() << "Client::registerProcessor: please use registerProcessor befor begin()";
 		return;
 	}
 	const auto&& availableSlots = processor->availableSlots();
 	auto counter = 0;
-	for (const auto& currentSlot : availableSlots)
-	{
-		if (m_processorCallbacks.contains(currentSlot))
-		{
+	for (const auto& currentSlot : availableSlots) {
+		if (m_processorCallbacks.contains(currentSlot)) {
 			qDebug() << "Client::registerProcessor: double register:" << currentSlot;
 			continue;
 		}
 		const auto&& callback = [processor](const QPointer<Connect>& connect,
-		                                    const QSharedPointer<Package>& package)
-		{
-			if (!processor)
-			{
-				qDebug() << "Client::registerProcessor: processor is null";
-				return;
-			}
-			processor->handlePackage(connect, package);
-		};
+			const QSharedPointer<Package>& package) {
+				if (!processor) {
+					qDebug() << "Client::registerProcessor: processor is null";
+					return;
+				}
+				processor->handlePackage(connect, package);
+			};
 		m_processorCallbacks[currentSlot] = callback;
 		++counter;
 	}
 	m_processors.insert(processor);
-	if (!counter)
-	{
+	if (!counter) {
 		qDebug() << "Client::registerProcessor: no available slots in processor:" << processor->metaObject()->
 			className();
 	}
 }
-void Client::createConnect(const QString& hostName, const quint16& port)
-{
+
+void Client::createConnect(const QString& hostName, const quint16& port) {
 	NETWORK_THISNULL_CHECK("Client::createConnect");
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::createConnect: this client need to begin:" << this;
 		return;
 	}
@@ -178,42 +158,38 @@ void Client::createConnect(const QString& hostName, const quint16& port)
 	auto runOnConnectThreadCallback =
 		[
 			this,
-			rotaryIndex
-		](const std::function<void()>& runCallback)
-	{
+				rotaryIndex
+		](const std::function<void()>& runCallback) {
 		this->m_socketThreadPool->run(runCallback, rotaryIndex);
-	};
-	m_socketThreadPool->run(
-		[
-			this,
-			runOnConnectThreadCallback,
-			hostName,
-			port
-		]()
-		{
-			this->m_connectPools[QThread::currentThread()]->createConnect(
-				runOnConnectThreadCallback,
-				hostName,
-				port
-			);
-		},
-		rotaryIndex
-	);
+		};
+			m_socketThreadPool->run(
+				[
+					this,
+						runOnConnectThreadCallback,
+						hostName,
+						port
+				]() {
+					this->m_connectPools[QThread::currentThread()]->createConnect(
+						runOnConnectThreadCallback,
+						hostName,
+						port
+					);
+				},
+						rotaryIndex
+						);
 }
+
 bool Client::waitForCreateConnect(
 	const QString& hostName,
 	const quint16& port,
 	const int& maximumConnectToHostWaitTime
-)
-{
+) {
 	NETWORK_THISNULL_CHECK("Client::waitForCreateConnect", false);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::waitForCreateConnect: this client need to begin:" << this;
 		return false;
 	}
-	if (this->containsConnect(hostName, port))
-	{
+	if (this->containsConnect(hostName, port)) {
 		return true;
 	}
 	QSharedPointer<QSemaphore> semaphore(new QSemaphore);
@@ -225,45 +201,40 @@ bool Client::waitForCreateConnect(
 	auto acquireSucceed = semaphore->tryAcquire(
 		1,
 		(maximumConnectToHostWaitTime == -1)
-			? (m_connectSettings->maximumConnectToHostWaitTime)
-			: (maximumConnectToHostWaitTime)
+		? (m_connectSettings->maximumConnectToHostWaitTime)
+		: (maximumConnectToHostWaitTime)
 	);
 	m_mutex.lock();
 	m_waitConnectSucceedSemaphore.remove(hostKey);
 	m_mutex.unlock();
-	if (!acquireSucceed)
-	{
+	if (!acquireSucceed) {
 		return false;
 	}
 	acquireSucceed = semaphore->tryAcquire(1);
 	//    qDebug() << "-->" << acquireSucceed;
 	return acquireSucceed;
 }
+
 qint32 Client::sendPayloadData(
 	const QString& hostName,
 	const quint16& port,
 	const QString& targetActionFlag,
 	const QByteArray& payloadData,
 	const QVariantMap& appendData,
-    const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
-    const ConnectPointerFunction& failCallback
-)
-{
+	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
+	const ConnectPointerFunction& failCallback
+) {
 	NETWORK_THISNULL_CHECK("Client::sendPayloadData", 0);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::sendPayloadData: this client need to begin:" << this;
-		if (failCallback)
-		{
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
 	}
 	auto connect = this->getConnect(hostName, port);
-	if (!connect)
-	{
-		if (failCallback)
-		{
+	if (!connect) {
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
@@ -276,22 +247,20 @@ qint32 Client::sendPayloadData(
 		failCallback
 	);
 }
+
 qint32 Client::sendVariantMapData(
 	const QString& hostName,
 	const quint16& port,
 	const QString& targetActionFlag,
 	const QVariantMap& variantMap,
 	const QVariantMap& appendData,
-    const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
-    const ConnectPointerFunction& failCallback
-)
-{
+	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
+	const ConnectPointerFunction& failCallback
+) {
 	NETWORK_THISNULL_CHECK("Client::sendVariantMapData", 0);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::sendVariantMapData: this client need to begin:" << this;
-		if (failCallback)
-		{
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
@@ -306,6 +275,7 @@ qint32 Client::sendVariantMapData(
 		failCallback
 	);
 }
+
 qint32 Client::sendFileData(
 	const QString& hostName,
 	const quint16& port,
@@ -314,23 +284,18 @@ qint32 Client::sendFileData(
 	const QVariantMap& appendData,
 	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
 	const ConnectPointerFunction& failCallback
-)
-{
+) {
 	NETWORK_THISNULL_CHECK("Client::sendFileData", 0);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::sendFileData: this client need to begin:" << this;
-		if (failCallback)
-		{
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
 	}
 	auto connect = this->getConnect(hostName, port);
-	if (!connect)
-	{
-		if (failCallback)
-		{
+	if (!connect) {
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
@@ -343,22 +308,20 @@ qint32 Client::sendFileData(
 		failCallback
 	);
 }
+
 qint32 Client::waitForSendPayloadData(
 	const QString& hostName,
 	const quint16& port,
 	const QString& targetActionFlag,
 	const QByteArray& payloadData,
 	const QVariantMap& appendData,
-    const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
-    const ConnectPointerFunction& failCallback
-)
-{
+	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
+	const ConnectPointerFunction& failCallback
+) {
 	NETWORK_THISNULL_CHECK("Client::waitForSendPayloadData", 0);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::waitForSendPayloadData: this client need to begin:" << this;
-		if (failCallback)
-		{
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
@@ -372,24 +335,20 @@ qint32 Client::waitForSendPayloadData(
 		appendData,
 		[
 			&semaphore,
-			succeedCallback
+				succeedCallback
 		]
-	(const auto& connect, const auto& package)
-		{
-			if (succeedCallback)
-			{
+		(const auto& connect, const auto& package) {
+			if (succeedCallback) {
 				succeedCallback(connect, package);
 			}
 			semaphore.release(2);
 		},
 		[
 			&semaphore,
-			failCallback
+				failCallback
 		]
-	(const auto& connect)
-		{
-			if (failCallback)
-			{
+		(const auto& connect) {
+			if (failCallback) {
 				failCallback(connect);
 			}
 			semaphore.release(1);
@@ -398,6 +357,7 @@ qint32 Client::waitForSendPayloadData(
 	semaphore.acquire(1);
 	return (semaphore.tryAcquire(1)) ? (sendReply) : (0);
 }
+
 qint32 Client::waitForSendVariantMapData(
 	const QString& hostName,
 	const quint16& port,
@@ -406,8 +366,7 @@ qint32 Client::waitForSendVariantMapData(
 	const QVariantMap& appendData,
 	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
 	const ConnectPointerFunction& failCallback
-)
-{
+) {
 	NETWORK_THISNULL_CHECK("Client::waitForSendVariantMapData", 0);
 	return this->waitForSendPayloadData(
 		hostName,
@@ -419,6 +378,7 @@ qint32 Client::waitForSendVariantMapData(
 		failCallback
 	);
 }
+
 qint32 Client::waitForSendFileData(
 	const QString& hostName,
 	const quint16& port,
@@ -427,14 +387,11 @@ qint32 Client::waitForSendFileData(
 	const QVariantMap& appendData,
 	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
 	const ConnectPointerFunction& failCallback
-)
-{
+) {
 	NETWORK_THISNULL_CHECK("Client::waitForSendFileData", 0);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::waitForSendFileData: this client need to begin:" << this;
-		if (failCallback)
-		{
+		if (failCallback) {
 			failCallback(nullptr);
 		}
 		return 0;
@@ -448,24 +405,20 @@ qint32 Client::waitForSendFileData(
 		appendData,
 		[
 			&semaphore,
-			succeedCallback
+				succeedCallback
 		]
-	(const auto& connect, const auto& package)
-		{
-			if (succeedCallback)
-			{
+		(const auto& connect, const auto& package) {
+			if (succeedCallback) {
 				succeedCallback(connect, package);
 			}
 			semaphore.release(2);
 		},
 		[
 			&semaphore,
-			failCallback
+				failCallback
 		]
-	(const auto& connect)
-		{
-			if (failCallback)
-			{
+		(const auto& connect) {
+			if (failCallback) {
 				failCallback(connect);
 			}
 			semaphore.release(1);
@@ -474,199 +427,173 @@ qint32 Client::waitForSendFileData(
 	semaphore.acquire(1);
 	return (semaphore.tryAcquire(1)) ? (sendReply) : (0);
 }
-QPointer<Connect> Client::getConnect(const QString& hostName, const quint16& port)
-{
+
+QPointer<Connect> Client::getConnect(const QString& hostName, const quint16& port) {
 	NETWORK_THISNULL_CHECK("Client::getConnect", nullptr);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::getConnect: this client need to begin:" << this;
 		return {};
 	}
-	for (const auto& connectPool : this->m_connectPools)
-	{
+	for (const auto& connectPool : this->m_connectPools) {
 		auto connect = connectPool->getConnectByHostAndPort(hostName, port);
-		if (!connect)
-		{
+		if (!connect) {
 			continue;
 		}
 		return connect;
 	}
-	if (!m_clientSettings->autoCreateConnect)
-	{
+	if (!m_clientSettings->autoCreateConnect) {
 		return {};
 	}
 	const auto&& autoConnectSucceed = this->waitForCreateConnect(hostName, port,
-	                                                             m_clientSettings->maximumAutoConnectToHostWaitTime);
-	if (!autoConnectSucceed)
-	{
+		m_clientSettings->maximumAutoConnectToHostWaitTime);
+	if (!autoConnectSucceed) {
 		return {};
 	}
-	for (const auto& connectPool : this->m_connectPools)
-	{
+	for (const auto& connectPool : this->m_connectPools) {
 		auto connect = connectPool->getConnectByHostAndPort(hostName, port);
-		if (!connect)
-		{
+		if (!connect) {
 			continue;
 		}
 		return connect;
 	}
 	return {};
 }
-bool Client::containsConnect(const QString& hostName, const quint16& port)
-{
+
+bool Client::containsConnect(const QString& hostName, const quint16& port) {
 	NETWORK_THISNULL_CHECK("Client::containsConnect", false);
-	if (!m_socketThreadPool)
-	{
+	if (!m_socketThreadPool) {
 		qDebug() << "Client::containsConnect: this client need to begin:" << this;
 		return {};
 	}
-	for (const auto& connectPool : this->m_connectPools)
-	{
+	for (const auto& connectPool : this->m_connectPools) {
 		auto connect = connectPool->getConnectByHostAndPort(hostName, port);
-		if (!connect)
-		{
+		if (!connect) {
 			continue;
 		}
 		return true;
 	}
 	return false;
 }
+
 void Client::onConnectToHostError(const QPointer<Connect>& connect,
-                                           const QPointer<ConnectPool>& connectPool)
-{
+	const QPointer<ConnectPool>& connectPool) {
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
 	this->releaseWaitConnectSucceedSemaphore(reply.first, reply.second, false);
-	if (!m_clientSettings->connectToHostErrorCallback)
-	{
+	if (!m_clientSettings->connectToHostErrorCallback) {
 		return;
 	}
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onConnectToHostError: error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second
-		]()
-		{
-			if (!this->m_clientSettings->connectToHostErrorCallback)
-			{
+				connect,
+				hostName = reply.first,
+				port = reply.second
+		]() {
+			if (!this->m_clientSettings->connectToHostErrorCallback) {
 				return;
 			}
 			this->m_clientSettings->connectToHostErrorCallback(connect, hostName, port);
 		}
-	);
+			);
 }
+
 void Client::onConnectToHostTimeout(const QPointer<Connect>& connect,
-                                             const QPointer<ConnectPool>& connectPool)
-{
+	const QPointer<ConnectPool>& connectPool) {
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
 	this->releaseWaitConnectSucceedSemaphore(reply.first, reply.second, false);
-	if (!m_clientSettings->connectToHostTimeoutCallback)
-	{
+	if (!m_clientSettings->connectToHostTimeoutCallback) {
 		return;
 	}
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onConnectToHostTimeout: error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second
-		]()
-		{
-			if (!this->m_clientSettings->connectToHostTimeoutCallback)
-			{
+				connect,
+				hostName = reply.first,
+				port = reply.second
+		]() {
+			if (!this->m_clientSettings->connectToHostTimeoutCallback) {
 				return;
 			}
 			this->m_clientSettings->connectToHostTimeoutCallback(connect, hostName, port);
 		}
-	);
+			);
 }
+
 void Client::onConnectToHostSucceed(const QPointer<Connect>& connect,
-                                             const QPointer<ConnectPool>& connectPool)
-{
+	const QPointer<ConnectPool>& connectPool) {
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onConnectToHostSucceed: connect error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second
-		]()
-		{
+				connect,
+				hostName = reply.first,
+				port = reply.second
+		]() {
 			this->releaseWaitConnectSucceedSemaphore(hostName, port, true);
-			if (!this->m_clientSettings->connectToHostSucceedCallback)
-			{
+			if (!this->m_clientSettings->connectToHostSucceedCallback) {
 				return;
 			}
 			this->m_clientSettings->connectToHostSucceedCallback(connect, hostName, port);
 		}
-	);
+			);
 }
+
 void Client::onRemoteHostClosed(const QPointer<Connect>& connect,
-                                         const QPointer<ConnectPool>& connectPool)
-{
-	if (!m_clientSettings->remoteHostClosedCallback)
-	{
+	const QPointer<ConnectPool>& connectPool) {
+	if (!m_clientSettings->remoteHostClosedCallback) {
 		return;
 	}
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onRemoteHostClosed: error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second
-		]()
-		{
+				connect,
+				hostName = reply.first,
+				port = reply.second
+		]() {
 			this->m_clientSettings->remoteHostClosedCallback(connect, hostName, port);
 		}
-	);
+			);
 }
+
 void Client::onReadyToDelete(const QPointer<Connect>& connect,
-                                      const QPointer<ConnectPool>& connectPool)
-{
-	if (!m_clientSettings->readyToDeleteCallback)
-	{
+	const QPointer<ConnectPool>& connectPool) {
+	if (!m_clientSettings->readyToDeleteCallback) {
 		return;
 	}
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onReadyToDelete: error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second
-		]()
-		{
+				connect,
+				hostName = reply.first,
+				port = reply.second
+		]() {
 			this->m_clientSettings->readyToDeleteCallback(connect, hostName, port);
 		}
-	);
+			);
 }
+
 void Client::onPackageSending(
 	const QPointer<Connect>& connect,
 	const QPointer<ConnectPool>& connectPool,
@@ -674,30 +601,26 @@ void Client::onPackageSending(
 	const qint64& payloadCurrentIndex,
 	const qint64& payloadCurrentSize,
 	const qint64& payloadTotalSize
-)
-{
-	if (!m_clientSettings->packageSendingCallback)
-	{
+) {
+	if (!m_clientSettings->packageSendingCallback) {
 		return;
 	}
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onPackageSending: error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second,
-			randomFlag,
-			payloadCurrentIndex,
-			payloadCurrentSize,
-			payloadTotalSize
-		]()
-		{
+				connect,
+				hostName = reply.first,
+				port = reply.second,
+				randomFlag,
+				payloadCurrentIndex,
+				payloadCurrentSize,
+				payloadTotalSize
+		]() {
 			this->m_clientSettings->packageSendingCallback(
 				connect,
 				hostName,
@@ -708,8 +631,9 @@ void Client::onPackageSending(
 				payloadTotalSize
 			);
 		}
-	);
+			);
 }
+
 void Client::onPackageReceiving(
 	const QPointer<Connect>& connect,
 	const QPointer<ConnectPool>& connectPool,
@@ -717,30 +641,26 @@ void Client::onPackageReceiving(
 	const qint64& payloadCurrentIndex,
 	const qint64& payloadCurrentSize,
 	const qint64& payloadTotalSize
-)
-{
-	if (!m_clientSettings->packageReceivingCallback)
-	{
+) {
+	if (!m_clientSettings->packageReceivingCallback) {
 		return;
 	}
 	const auto&& reply = connectPool->getHostAndPortByConnect(connect);
-	if (reply.first.isEmpty() || !reply.second)
-	{
+	if (reply.first.isEmpty() || !reply.second) {
 		qDebug() << "Client::onPackageReceiving: error";
 		return;
 	}
 	m_callbackThreadPool->run(
 		[
 			this,
-			connect,
-			hostName = reply.first,
-			port = reply.second,
-			randomFlag,
-			payloadCurrentIndex,
-			payloadCurrentSize,
-			payloadTotalSize
-		]()
-		{
+				connect,
+				hostName = reply.first,
+				port = reply.second,
+				randomFlag,
+				payloadCurrentIndex,
+				payloadCurrentSize,
+				payloadTotalSize
+		]() {
 			this->m_clientSettings->packageReceivingCallback(
 				connect,
 				hostName,
@@ -751,50 +671,42 @@ void Client::onPackageReceiving(
 				payloadTotalSize
 			);
 		}
-	);
+			);
 }
+
 void Client::onPackageReceived(
 	const QPointer<Connect>& connect,
 	const QPointer<ConnectPool>& connectPool,
 	const QSharedPointer<Package>& package
-)
-{
-	if (m_processorCallbacks.isEmpty())
-	{
-		if (!m_clientSettings->packageReceivedCallback)
-		{
+) {
+	if (m_processorCallbacks.isEmpty()) {
+		if (!m_clientSettings->packageReceivedCallback) {
 			return;
 		}
 		const auto&& reply = connectPool->getHostAndPortByConnect(connect);
-		if (reply.first.isEmpty() || !reply.second)
-		{
+		if (reply.first.isEmpty() || !reply.second) {
 			qDebug() << "Client::onPackageReceived: error";
 			return;
 		}
 		m_callbackThreadPool->run(
 			[
 				this,
-				connect,
-				hostName = reply.first,
-				port = reply.second,
-				package
-			]()
-			{
+					connect,
+					hostName = reply.first,
+					port = reply.second,
+					package
+			]() {
 				this->m_clientSettings->packageReceivedCallback(connect, hostName, port, package);
 			}
-		);
-	}
-	else
-	{
-		if (package->targetActionFlag().isEmpty())
-		{
+				);
+	} else {
+		if (package->targetActionFlag().isEmpty()) {
 			qDebug() <<
 				"Client::onPackageReceived: processor is enable, but package targetActionFlag is empty";
 			return;
 		}
 		const auto&& it = m_processorCallbacks.find(package->targetActionFlag());
-		if (it == m_processorCallbacks.end())
-		{
+		if (it == m_processorCallbacks.end()) {
 			qDebug() <<
 				"Client::onPackageReceived: processor is enable, but package targetActionFlag not match:" <<
 				package->targetActionFlag();
@@ -803,65 +715,58 @@ void Client::onPackageReceived(
 		m_callbackThreadPool->run(
 			[
 				connect,
-				package,
-				callback = *it
-			]()
-			{
+					package,
+					callback = *it
+			]() {
 				callback(connect, package);
 			}
-		);
+				);
 	}
 }
+
 void Client::onWaitReplySucceedPackage(
 	const QPointer<Connect>& connect,
 	const QPointer<ConnectPool>&,
 	const QSharedPointer<Package>& package,
 	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback
-)
-{
+) {
 	m_callbackThreadPool->run(
 		[
 			connect,
-			package,
-			succeedCallback
-		]()
-		{
+				package,
+				succeedCallback
+		]() {
 			succeedCallback(connect, package);
 		}
-	);
+			);
 }
+
 void Client::onWaitReplyPackageFail(
 	const QPointer<Connect>& connect,
 	const QPointer<ConnectPool>&,
 	const ConnectPointerFunction& failCallback
-)
-{
+) {
 	m_callbackThreadPool->run(
 		[
 			connect,
-			failCallback
-		]()
-		{
+				failCallback
+		]() {
 			failCallback(connect);
 		}
-	);
+			);
 }
+
 void Client::releaseWaitConnectSucceedSemaphore(const QString& hostName, const quint16& port,
-                                                         const bool& succeed)
-{
+	const bool& succeed) {
 	//    qDebug() << "releaseWaitConnectSucceedSemaphore: hostName:" << hostName << ", port:" << port;
 	const auto&& hostKey = QString("%1:%2").arg(hostName, QString::number(port));
 	this->m_mutex.lock();
 	{
 		auto it = this->m_waitConnectSucceedSemaphore.find(hostKey);
-		if (it != this->m_waitConnectSucceedSemaphore.end())
-		{
-			if (it->toStrongRef())
-			{
+		if (it != this->m_waitConnectSucceedSemaphore.end()) {
+			if (it->toStrongRef()) {
 				it->toStrongRef()->release((succeed) ? (2) : (1));
-			}
-			else
-			{
+			} else {
 				qDebug() << "Client::onConnectToHostSucceed: semaphore error";
 			}
 		}

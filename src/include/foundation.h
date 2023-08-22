@@ -2,7 +2,6 @@
 #ifndef NETWORK_INCLUDE_NETWORK_FOUNDATION_H_
 #define NETWORK_INCLUDE_NETWORK_FOUNDATION_H_
 
-// C++ lib import
 #include <functional>
 #include <vector>
 #include <memory>
@@ -36,7 +35,7 @@
 #define NETWORK_NULLPTR_CHECK( ptr, ... ) \
     if ( !ptr ) { qDebug( "%s: %s is null", __func__, # ptr ); return __VA_ARGS__; }
 
-#define NETWORK_THISNULL_CHECK( message, ... )                \
+#define NETWORK_THISNULL_CHECK( message, ... )                  \
     {                                                           \
         auto this_ = this;                                      \
         if ( !this_ )                                           \
@@ -102,12 +101,10 @@ using ClientSettingsSharedPointer = QSharedPointer<ClientSettings>;
 using LanSettingsSharedPointer = QSharedPointer<LanSettings>;
 
 using ConnectPointerFunction = std::function<void(const ConnectPointer& connect)>;
-using ConnectPointerAndPackageSharedPointerFunction = std::function<void(
-	const ConnectPointer& connect, const PackageSharedPointer& package)>;
+using ConnectPointerAndPackageSharedPointerFunction = std::function<void(const ConnectPointer& connect, const PackageSharedPointer& package)>;
 
 struct NetworkOnReceivedCallbackPackage {
-	std::function<void(const ConnectPointer& connect, const PackageSharedPointer&)> succeedCallback =
-		nullptr;
+	std::function<void(const ConnectPointer& connect, const PackageSharedPointer&)> succeedCallback = nullptr;
 	std::function<void(const ConnectPointer& connect)> failCallback = nullptr;
 };
 
@@ -126,11 +123,11 @@ public Q_SLOTS:
 	void onRun();
 
 private:
-	QMutex mutex_;
-	QSharedPointer<std::vector<std::function<void()>>> waitForRunCallbacks_;
-	bool alreadyCall_ = false;
-	qint64 lastRunTime_ = 0;
-	int lastRunCallbackCount_ = 0;
+	QMutex m_mutex;
+	QSharedPointer<std::vector<std::function<void()>>> m_waitForRunCallbacks;
+	bool m_alreadyCall = false;
+	qint64 m_lastRunTime = 0;
+	int m_lastRunCallbackCount = 0;
 };
 
 class NetworkThreadPool : public QObject {
@@ -142,28 +139,26 @@ public:
 
 	~NetworkThreadPool() override;
 
-    inline int nextRotaryIndex(){
-        rotaryIndex_ = (rotaryIndex_ + 1) % helpers_->size();
-        return rotaryIndex_;
-    }
+	inline int nextRotaryIndex() {
+		rotaryIndex_ = (rotaryIndex_ + 1) % helpers_->size();
+		return rotaryIndex_;
+	}
 
 	int run(const std::function<void()>& callback, const int& threadIndex = -1);
 
-    inline void runEach(const std::function<void()>& callback){
-        for (auto index = 0; index < helpers_->size(); ++index)
-        {
-            (*helpers_)[index]->run(callback);
-        }
-    }
+	inline void runEach(const std::function<void()>& callback) {
+		for (auto index = 0; index < helpers_->size(); ++index) {
+			(*helpers_)[index]->run(callback);
+		}
+	}
 
 	int waitRun(const std::function<void()>& callback, const int& threadIndex = -1);
 
-    inline void waitRunEach(const std::function<void()>& callback){
-        for (auto index = 0; index < helpers_->size(); ++index)
-        {
-            this->waitRun(callback, index);
-        }
-    }
+	inline void waitRunEach(const std::function<void()>& callback) {
+		for (auto index = 0; index < helpers_->size(); ++index) {
+			this->waitRun(callback, index);
+		}
+	}
 
 private:
 	QSharedPointer<QThreadPool> threadPool_;
@@ -180,49 +175,42 @@ public:
 
 	static QString calculateNodeMarkSummary(const QString& dutyMark);
 
-    inline qint64 applicationStartTime() const
-    {
-        return applicationStartTime_;
-    }
+	inline qint64 applicationStartTime() const {
+		return m_applicationStartTime;
+	}
 
-    inline QString applicationFilePath() const
-    {
-        return applicationFilePath_;
-    }
+	inline QString applicationFilePath() const {
+		return m_applicationFilePath;
+	}
 
-    inline QString localHostName() const
-    {
-        return localHostName_;
-    }
+	inline QString localHostName() const {
+		return m_localHostName;
+	}
 
-    inline qint64 nodeMarkCreatedTime() const
-    {
-        return nodeMarkCreatedTime_;
-    }
+	inline qint64 nodeMarkCreatedTime() const {
+		return m_nodeMarkCreatedTime;
+	}
 
-    inline QString nodeMarkClassAddress() const
-    {
-        return nodeMarkClassAddress_;
-    }
+	inline QString nodeMarkClassAddress() const {
+		return m_nodeMarkClassAddress;
+	}
 
-    inline QString dutyMark() const
-    {
-        return dutyMark_;
-    }
+	inline QString dutyMark() const {
+		return m_dutyMark;
+	}
 
-    inline QString nodeMarkSummary() const
-    {
-        return nodeMarkSummary_;
-    }
+	inline QString nodeMarkSummary() const {
+		return m_nodeMarkSummary;
+	}
 
 private:
-	static qint64 applicationStartTime_;
-	static QString applicationFilePath_;
-	static QString localHostName_;
-	qint64 nodeMarkCreatedTime_;
-	QString nodeMarkClassAddress_;
-	QString dutyMark_;
-	QString nodeMarkSummary_;
+	static qint64 m_applicationStartTime;
+	static QString m_applicationFilePath;
+	static QString m_localHostName;
+	qint64 m_nodeMarkCreatedTime;
+	QString m_nodeMarkClassAddress;
+	QString m_dutyMark;
+	QString m_nodeMarkSummary;
 };
 
 namespace Network {

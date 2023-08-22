@@ -26,6 +26,7 @@ void ConnectSettings::setFilePathProviderToDefaultDir() {
 		return QString("%1/NetworkReceivedFile/%2").arg(defaultDir, fileName);
 	};
 }
+
 void ConnectSettings::setFilePathProviderToDir(const QDir& dir) {
 	filePathProvider = [dir](const auto&, const auto&, const auto& fileName) {
 		return QString("%1/%2").arg(dir.path(), fileName);
@@ -33,19 +34,19 @@ void ConnectSettings::setFilePathProviderToDir(const QDir& dir) {
 }
 // Connect
 Connect::Connect(const QSharedPointer<ConnectSettings>& connectSettings) :
-	connectSettings_(connectSettings),
-	tcpSocket_(new QTcpSocket),
-	connectCreateTime_(QDateTime::currentMSecsSinceEpoch()) {
-	connect(tcpSocket_.data(), &QAbstractSocket::stateChanged, this, &Connect::onTcpSocketStateChanged,
+	m_connectSettings(connectSettings),
+	m_tcpSocket(new QTcpSocket),
+	m_connectCreateTime(QDateTime::currentMSecsSinceEpoch()) {
+	connect(m_tcpSocket.data(), &QAbstractSocket::stateChanged, this, &Connect::onTcpSocketStateChanged,
 		Qt::DirectConnection);
-	connect(tcpSocket_.data(), &QAbstractSocket::bytesWritten, this, &Connect::onTcpSocketBytesWritten,
+	connect(m_tcpSocket.data(), &QAbstractSocket::bytesWritten, this, &Connect::onTcpSocketBytesWritten,
 		Qt::DirectConnection);
-	connect(tcpSocket_.data(), &QTcpSocket::readyRead, this, &Connect::onTcpSocketReadyRead,
+	connect(m_tcpSocket.data(), &QTcpSocket::readyRead, this, &Connect::onTcpSocketReadyRead,
 		Qt::DirectConnection);
-	if (connectSettings_->fileTransferEnabled && !connectSettings_->filePathProvider) {
-		connectSettings_->setFilePathProviderToDefaultDir();
+	if (m_connectSettings->fileTransferEnabled && !m_connectSettings->filePathProvider) {
+		m_connectSettings->setFilePathProviderToDefaultDir();
 		qDebug() << "Connect: fileTransfer is enabled, but filePathProvider is null, use default dir:"
-			<< connectSettings_->filePathProvider(QPointer<Connect>(nullptr),
+			<< m_connectSettings->filePathProvider(QPointer<Connect>(nullptr),
 				QSharedPointer<Package>(nullptr), QString());
 	}
 #ifdef Q_OS_IOS
@@ -67,14 +68,15 @@ void Connect::createConnect(
 	const quint16& port
 ) {
 	QSharedPointer<Connect> newConnect(new Connect(connectSettings));
-	newConnect->runOnConnectThreadCallback_ = runOnConnectThreadCallback;
-	newConnect->sendRandomFlagRotaryIndex_ = connectSettings->randomFlagRangeStart - 1;
+	newConnect->m_runOnConnectThreadCallback = runOnConnectThreadCallback;
+	newConnect->m_sendRandomFlagRotaryIndex = connectSettings->randomFlagRangeStart - 1;
 	NETWORK_NULLPTR_CHECK(onConnectCreatedCallback);
 	onConnectCreatedCallback(newConnect);
 	newConnect->startTimerForConnectToHostTimeOut();
-	newConnect->tcpSocket_->setProxy(QNetworkProxy::NoProxy);
-	newConnect->tcpSocket_->connectToHost(hostName, port);
+	newConnect->m_tcpSocket->setProxy(QNetworkProxy::NoProxy);
+	newConnect->m_tcpSocket->connectToHost(hostName, port);
 }
+
 void Connect::createConnect(
 	const std::function<void(const QSharedPointer<Connect>&)>& onConnectCreatedCallback,
 	const std::function<void(std::function<void()>)>& runOnConnectThreadCallback,
@@ -82,21 +84,23 @@ void Connect::createConnect(
 	const qintptr& socketDescriptor
 ) {
 	QSharedPointer<Connect> newConnect(new Connect(connectSettings));
-	newConnect->runOnConnectThreadCallback_ = runOnConnectThreadCallback;
-	newConnect->sendRandomFlagRotaryIndex_ = connectSettings->randomFlagRangeStart - 1;
+	newConnect->m_runOnConnectThreadCallback = runOnConnectThreadCallback;
+	newConnect->m_sendRandomFlagRotaryIndex = connectSettings->randomFlagRangeStart - 1;
 	NETWORK_NULLPTR_CHECK(onConnectCreatedCallback);
 	onConnectCreatedCallback(newConnect);
 	newConnect->startTimerForConnectToHostTimeOut();
-	newConnect->tcpSocket_->setSocketDescriptor(socketDescriptor);
+	newConnect->m_tcpSocket->setSocketDescriptor(socketDescriptor);
 }
+
 void Connect::close() {
 	NETWORK_THISNULL_CHECK("Connect::close");
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
 	this->onReadyToDelete();
 }
+
 qint32 Connect::sendPayloadData(
 	const QString& targetActionFlag,
 	const QByteArray& payloadData,
@@ -105,10 +109,10 @@ qint32 Connect::sendPayloadData(
 	const ConnectPointerFunction& failCallback
 ) {
 	NETWORK_THISNULL_CHECK("Connect::sendPayloadData", 0);
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return 0;
 	}
-	NETWORK_NULLPTR_CHECK(runOnConnectThreadCallback_, 0);
+	NETWORK_NULLPTR_CHECK(m_runOnConnectThreadCallback, 0);
 	const auto currentRandomFlag = this->nextRandomFlag();
 	const auto&& readySendPayloadDataSucceed = this->readySendPayloadData(
 		currentRandomFlag,
@@ -123,6 +127,7 @@ qint32 Connect::sendPayloadData(
 	}
 	return currentRandomFlag;
 }
+
 qint32 Connect::sendVariantMapData(
 	const QString& targetActionFlag,
 	const QVariantMap& variantMap,
@@ -139,6 +144,7 @@ qint32 Connect::sendVariantMapData(
 		failCallback
 	);
 }
+
 qint32 Connect::sendFileData(
 	const QString& targetActionFlag,
 	const QFileInfo& fileInfo,
@@ -147,10 +153,10 @@ qint32 Connect::sendFileData(
 	const ConnectPointerFunction& failCallback
 ) {
 	NETWORK_THISNULL_CHECK("Connect::sendFileData", 0);
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return 0;
 	}
-	NETWORK_NULLPTR_CHECK(runOnConnectThreadCallback_, 0);
+	NETWORK_NULLPTR_CHECK(m_runOnConnectThreadCallback, 0);
 	const auto currentRandomFlag = this->nextRandomFlag();
 	const auto&& readySendFileDataSucceed = this->readySendFileData(
 		currentRandomFlag,
@@ -165,16 +171,17 @@ qint32 Connect::sendFileData(
 	}
 	return currentRandomFlag;
 }
+
 qint32 Connect::replyPayloadData(
 	const qint32& receivedPackageRandomFlag,
 	const QByteArray& payloadData,
 	const QVariantMap& appendData
 ) {
 	NETWORK_THISNULL_CHECK("Connect::replyPayloadData", 0);
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return 0;
 	}
-	NETWORK_NULLPTR_CHECK(runOnConnectThreadCallback_, 0);
+	NETWORK_NULLPTR_CHECK(m_runOnConnectThreadCallback, 0);
 	const auto&& readySendPayloadDataSucceed = this->readySendPayloadData(
 		receivedPackageRandomFlag,
 		{}, // empty targetActionFlag
@@ -188,6 +195,7 @@ qint32 Connect::replyPayloadData(
 	}
 	return receivedPackageRandomFlag;
 }
+
 qint32 Connect::replyVariantMapData(
 	const qint32& receivedPackageRandomFlag,
 	const QVariantMap& variantMap,
@@ -200,16 +208,17 @@ qint32 Connect::replyVariantMapData(
 		appendData
 	);
 }
+
 qint32 Connect::replyFile(
 	const qint32& receivedPackageRandomFlag,
 	const QFileInfo& fileInfo,
 	const QVariantMap& appendData
 ) {
 	NETWORK_THISNULL_CHECK("Connect::replyFile", 0);
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return 0;
 	}
-	NETWORK_NULLPTR_CHECK(runOnConnectThreadCallback_, 0);
+	NETWORK_NULLPTR_CHECK(m_runOnConnectThreadCallback, 0);
 	const auto&& readySendFileData = this->readySendFileData(
 		receivedPackageRandomFlag,
 		{}, // empty targetActionFlag
@@ -223,16 +232,17 @@ qint32 Connect::replyFile(
 	}
 	return receivedPackageRandomFlag;
 }
+
 bool Connect::putPayloadData(
 	const QString& targetActionFlag,
 	const QByteArray& payloadData,
 	const QVariantMap& appendData
 ) {
 	NETWORK_THISNULL_CHECK("Connect::putPayloadData", 0);
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return false;
 	}
-	NETWORK_NULLPTR_CHECK(runOnConnectThreadCallback_, 0);
+	NETWORK_NULLPTR_CHECK(m_runOnConnectThreadCallback, 0);
 	const auto&& readySendPayloadDataSucceed = this->readySendPayloadData(
 		2000000001,
 		targetActionFlag,
@@ -246,6 +256,7 @@ bool Connect::putPayloadData(
 	}
 	return true;
 }
+
 bool Connect::putVariantMapData(
 	const QString& targetActionFlag,
 	const QVariantMap& variantMap,
@@ -258,16 +269,17 @@ bool Connect::putVariantMapData(
 		appendData
 	);
 }
+
 bool Connect::putFile(
 	const QString& targetActionFlag,
 	const QFileInfo& fileInfo,
 	const QVariantMap& appendData
 ) {
 	NETWORK_THISNULL_CHECK("Connect::putFile", 0);
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return false;
 	}
-	NETWORK_NULLPTR_CHECK(runOnConnectThreadCallback_, 0);
+	NETWORK_NULLPTR_CHECK(m_runOnConnectThreadCallback, 0);
 	const auto&& readySendFileData = this->readySendFileData(
 		2000000001,
 		targetActionFlag,
@@ -281,49 +293,50 @@ bool Connect::putFile(
 	}
 	return true;
 }
+
 void Connect::onTcpSocketStateChanged() {
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
-	const auto&& state = tcpSocket_->state();
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
+	const auto&& state = m_tcpSocket->state();
 	//    qDebug() << "onTcpSocketStateChanged:" << this << ": state:" << state;
 	switch (state) {
 	case QAbstractSocket::ConnectedState:
 	{
-		if (!timerForConnectToHostTimeOut_.isNull()) {
-			timerForConnectToHostTimeOut_.clear();
+		if (!m_timerForConnectToHostTimeOut.isNull()) {
+			m_timerForConnectToHostTimeOut.clear();
 		}
-		NETWORK_NULLPTR_CHECK(connectSettings_->connectToHostSucceedCallback);
-		connectSettings_->connectToHostSucceedCallback(this);
-		onceConnectSucceed_ = true;
-		connectSucceedTime_ = QDateTime::currentMSecsSinceEpoch();
+		NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostSucceedCallback);
+		m_connectSettings->connectToHostSucceedCallback(this);
+		m_onceConnectSucceed = true;
+		m_connectSucceedTime = QDateTime::currentMSecsSinceEpoch();
 		break;
 	}
 	case QAbstractSocket::UnconnectedState:
 	{
 		//            qDebug() << "onTcpSocketStateChanged:" << this << ": UnconnectedState: error:" << tcpSocket_->error();
-		switch (tcpSocket_->error()) {
+		switch (m_tcpSocket->error()) {
 		case QAbstractSocket::UnknownSocketError:
 		{
-			if (onceConnectSucceed_) {
+			if (m_onceConnectSucceed) {
 				break;
 			}
-			NETWORK_NULLPTR_CHECK(connectSettings_->connectToHostErrorCallback);
-			connectSettings_->connectToHostErrorCallback(this);
+			NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostErrorCallback);
+			m_connectSettings->connectToHostErrorCallback(this);
 			break;
 		}
 		case QAbstractSocket::RemoteHostClosedError:
 		{
-			NETWORK_NULLPTR_CHECK(connectSettings_->remoteHostClosedCallback);
-			connectSettings_->remoteHostClosedCallback(this);
+			NETWORK_NULLPTR_CHECK(m_connectSettings->remoteHostClosedCallback);
+			m_connectSettings->remoteHostClosedCallback(this);
 			break;
 		}
 		case QAbstractSocket::HostNotFoundError:
 		case QAbstractSocket::ConnectionRefusedError:
 		{
-			NETWORK_NULLPTR_CHECK(connectSettings_->connectToHostErrorCallback);
-			connectSettings_->connectToHostErrorCallback(this);
+			NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostErrorCallback);
+			m_connectSettings->connectToHostErrorCallback(this);
 			break;
 		}
 		case QAbstractSocket::NetworkError:
@@ -332,7 +345,7 @@ void Connect::onTcpSocketStateChanged() {
 		}
 		default:
 		{
-			qDebug() << "onTcpSocketStateChanged: unknow error:" << tcpSocket_->error();
+			qDebug() << "onTcpSocketStateChanged: unknow error:" << m_tcpSocket->error();
 			break;
 		}
 		}
@@ -345,40 +358,42 @@ void Connect::onTcpSocketStateChanged() {
 	}
 	}
 }
+
 void Connect::onTcpSocketBytesWritten(const qint64& bytes) {
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
-	waitForSendBytes_ -= bytes;
-	alreadyWrittenBytes_ += bytes;
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
+	m_waitForSendBytes -= bytes;
+	m_alreadyWrittenBytes += bytes;
 	//    qDebug() << "onTcpSocketBytesWritten:" << waitForSendBytes_ << alreadyWrittenBytes_ << QThread::currentThread();
 }
+
 void Connect::onTcpSocketReadyRead() {
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
-	const auto&& data = tcpSocket_->readAll();
-	tcpSocketBuffer_.append(data);
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
+	const auto&& data = m_tcpSocket->readAll();
+	m_tcpSocketBuffer.append(data);
 	//    qDebug() << tcpSocketBuffer_.size() << data.size();
 	forever
 	{
-		const auto && checkReply = Package::checkDataIsReadyReceive(tcpSocketBuffer_);
+		const auto && checkReply = Package::checkDataIsReadyReceive(m_tcpSocketBuffer);
 		if (checkReply > 0) {
 			return;
 		}
 		if (checkReply < 0) {
-			tcpSocketBuffer_.remove(0, checkReply * -1);
+			m_tcpSocketBuffer.remove(0, checkReply * -1);
 		} else {
-			auto package = Package::readPackage(tcpSocketBuffer_);
+			auto package = Package::readPackage(m_tcpSocketBuffer);
 			if (package->isCompletePackage()) {
 				switch (package->packageFlag()) {
 				case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
 				case NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG:
 					{
-						NETWORK_NULLPTR_CHECK(connectSettings_->packageReceivingCallback);
-						connectSettings_->packageReceivingCallback(this, package->randomFlag(), 0,
+						NETWORK_NULLPTR_CHECK(m_connectSettings->packageReceivingCallback);
+						m_connectSettings->packageReceivingCallback(this, package->randomFlag(), 0,
 																   package->payloadDataCurrentSize(),
 																   package->payloadDataTotalSize());
 						this->onDataTransportPackageReceived(package);
@@ -386,12 +401,12 @@ void Connect::onTcpSocketReadyRead() {
 					}
 				case NETWORKPACKAGE_PAYLOADDATAREQUESTPACKGEFLAG:
 					{
-						if (!sendPayloadPackagePool_.contains(package->randomFlag())) {
+						if (!m_sendPayloadPackagePool.contains(package->randomFlag())) {
 							qDebug() << "Connect::onTcpSocketReadyRead: no contains randonFlag:" << package->
 								randomFlag();
 							break;
 						}
-						auto& packages = sendPayloadPackagePool_[package->randomFlag()];
+						auto& packages = m_sendPayloadPackagePool[package->randomFlag()];
 						if (packages.isEmpty()) {
 							qDebug() << "Connect::onTcpSocketReadyRead: packages is empty:" << package->
 								randomFlag();
@@ -400,8 +415,8 @@ void Connect::onTcpSocketReadyRead() {
 						auto nextPackage = packages.first();
 						packages.pop_front();
 						this->sendPackageToRemote(nextPackage);
-						NETWORK_NULLPTR_CHECK(connectSettings_->packageSendingCallback);
-						connectSettings_->packageSendingCallback(
+						NETWORK_NULLPTR_CHECK(m_connectSettings->packageSendingCallback);
+						m_connectSettings->packageSendingCallback(
 							this,
 							package->randomFlag(),
 							nextPackage->payloadDataOriginalIndex(),
@@ -409,20 +424,20 @@ void Connect::onTcpSocketReadyRead() {
 							nextPackage->payloadDataTotalSize()
 						);
 						if (packages.isEmpty()) {
-							sendPayloadPackagePool_.remove(package->randomFlag());
+							m_sendPayloadPackagePool.remove(package->randomFlag());
 						}
 						break;
 					}
 				case NETWORKPACKAGE_FILEDATAREQUESTPACKGEFLAG:
 					{
-						const auto&& itForFile = waitForSendFiles_.find(package->randomFlag());
-						const auto&& fileIsContains = itForFile != waitForSendFiles_.end();
+						const auto&& itForFile = m_waitForSendFiles.find(package->randomFlag());
+						const auto&& fileIsContains = itForFile != m_waitForSendFiles.end();
 						if (!fileIsContains) {
 							qDebug() << "Connect::onTcpSocketReadyRead: Not contains file, randomFlag:" <<
 								package->randomFlag();
 							break;
 						}
-						const auto&& currentFileData = itForFile.value()->read(connectSettings_->cutPackageSize);
+						const auto&& currentFileData = itForFile.value()->read(m_connectSettings->cutPackageSize);
 						this->sendPackageToRemote(
 							Package::createFileTransportPackage(
 								{}, // empty targetActionFlag,
@@ -433,8 +448,8 @@ void Connect::onTcpSocketReadyRead() {
 								this->needCompressionPayloadData(currentFileData.size())
 							)
 						);
-						NETWORK_NULLPTR_CHECK(connectSettings_->packageSendingCallback);
-						connectSettings_->packageSendingCallback(
+						NETWORK_NULLPTR_CHECK(m_connectSettings->packageSendingCallback);
+						m_connectSettings->packageSendingCallback(
 							this,
 							package->randomFlag(),
 							itForFile.value()->pos() - currentFileData.size(),
@@ -443,7 +458,7 @@ void Connect::onTcpSocketReadyRead() {
 						);
 						if (itForFile.value()->atEnd()) {
 							itForFile.value()->close();
-							waitForSendFiles_.erase(itForFile);
+							m_waitForSendFiles.erase(itForFile);
 						}
 						break;
 					}
@@ -458,16 +473,16 @@ void Connect::onTcpSocketReadyRead() {
 				switch (package->packageFlag()) {
 				case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
 					{
-						const auto&& itForPackage = receivePayloadPackagePool_.find(package->randomFlag());
-						const auto&& packageIsCached = itForPackage != receivePayloadPackagePool_.end();
+						const auto&& itForPackage = m_receivePayloadPackagePool.find(package->randomFlag());
+						const auto&& packageIsCached = itForPackage != m_receivePayloadPackagePool.end();
 						if (packageIsCached) {
 							auto payloadCurrentIndex = (*itForPackage)->payloadDataCurrentSize();
-							NETWORK_NULLPTR_CHECK(connectSettings_->packageReceivingCallback);
-							connectSettings_->packageReceivingCallback(this, package->randomFlag(), payloadCurrentIndex,
+							NETWORK_NULLPTR_CHECK(m_connectSettings->packageReceivingCallback);
+							m_connectSettings->packageReceivingCallback(this, package->randomFlag(), payloadCurrentIndex,
 																	   package->payloadDataCurrentSize(),
 																	   package->payloadDataTotalSize());
 							if (!(*itForPackage)->mixPackage(package)) {
-								receivePayloadPackagePool_.erase(itForPackage);
+								m_receivePayloadPackagePool.erase(itForPackage);
 								return;
 							}
 							if ((*itForPackage)->isAbandonPackage()) {
@@ -475,16 +490,16 @@ void Connect::onTcpSocketReadyRead() {
 							}
 							if ((*itForPackage)->isCompletePackage()) {
 								this->onDataTransportPackageReceived(*itForPackage);
-								receivePayloadPackagePool_.erase(itForPackage);
+								m_receivePayloadPackagePool.erase(itForPackage);
 							} else {
 								this->sendDataRequestToRemote(package);
 							}
 						} else {
-							NETWORK_NULLPTR_CHECK(connectSettings_->packageReceivingCallback);
-							connectSettings_->packageReceivingCallback(this, package->randomFlag(), 0,
+							NETWORK_NULLPTR_CHECK(m_connectSettings->packageReceivingCallback);
+							m_connectSettings->packageReceivingCallback(this, package->randomFlag(), 0,
 																	   package->payloadDataCurrentSize(),
 																	   package->payloadDataTotalSize());
-							receivePayloadPackagePool_[package->randomFlag()] = package;
+							m_receivePayloadPackagePool[package->randomFlag()] = package;
 							this->sendDataRequestToRemote(package);
 						}
 						break;
@@ -500,88 +515,93 @@ void Connect::onTcpSocketReadyRead() {
 		}
 	}
 }
+
 void Connect::onTcpSocketConnectToHostTimeOut() {
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	NETWORK_NULLPTR_CHECK(timerForConnectToHostTimeOut_);
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
-	NETWORK_NULLPTR_CHECK(connectSettings_->connectToHostTimeoutCallback);
-	connectSettings_->connectToHostTimeoutCallback(this);
+	NETWORK_NULLPTR_CHECK(m_timerForConnectToHostTimeOut);
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
+	NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostTimeoutCallback);
+	m_connectSettings->connectToHostTimeoutCallback(this);
 	this->onReadyToDelete();
 }
+
 void Connect::onSendPackageCheck() {
 	//    qDebug() << "onSendPackageCheck:" << QThread::currentThread() << this->thread();
-	if (onReceivedCallbacks_.isEmpty()) {
-		timerForSendPackageCheck_.clear();
+	if (m_onReceivedCallbacks.isEmpty()) {
+		m_timerForSendPackageCheck.clear();
 	} else {
 		const auto&& currentTime = QDateTime::currentMSecsSinceEpoch();
-		auto it = onReceivedCallbacks_.begin();
-		while ((it != onReceivedCallbacks_.end()) &&
-			((currentTime - it->sendTime) > connectSettings_->maximumReceivePackageWaitTime)) {
+		auto it = m_onReceivedCallbacks.begin();
+		while ((it != m_onReceivedCallbacks.end()) &&
+			((currentTime - it->sendTime) > m_connectSettings->maximumReceivePackageWaitTime)) {
 			if (it->failCallback) {
-				NETWORK_NULLPTR_CHECK(connectSettings_->waitReplyPackageFailCallback);
-				connectSettings_->waitReplyPackageFailCallback(this, it->failCallback);
+				NETWORK_NULLPTR_CHECK(m_connectSettings->waitReplyPackageFailCallback);
+				m_connectSettings->waitReplyPackageFailCallback(this, it->failCallback);
 			}
-			onReceivedCallbacks_.erase(it);
-			it = onReceivedCallbacks_.begin();
+			m_onReceivedCallbacks.erase(it);
+			it = m_onReceivedCallbacks.begin();
 		}
-		if (!onReceivedCallbacks_.isEmpty()) {
-			timerForSendPackageCheck_->start();
+		if (!m_onReceivedCallbacks.isEmpty()) {
+			m_timerForSendPackageCheck->start();
 		}
 	}
 }
+
 void Connect::startTimerForConnectToHostTimeOut() {
-	if (timerForConnectToHostTimeOut_) {
+	if (m_timerForConnectToHostTimeOut) {
 		qDebug() << "startTimerForConnectToHostTimeOut: error, timer already started";
 		return;
 	}
-	if (connectSettings_->maximumConnectToHostWaitTime == -1) {
+	if (m_connectSettings->maximumConnectToHostWaitTime == -1) {
 		return;
 	}
-	timerForConnectToHostTimeOut_.reset(new QTimer);
-	connect(timerForConnectToHostTimeOut_.data(), &QTimer::timeout,
+	m_timerForConnectToHostTimeOut.reset(new QTimer);
+	connect(m_timerForConnectToHostTimeOut.data(), &QTimer::timeout,
 		this, &Connect::onTcpSocketConnectToHostTimeOut,
 		Qt::DirectConnection);
-	timerForConnectToHostTimeOut_->setSingleShot(true);
-	timerForConnectToHostTimeOut_->start(connectSettings_->maximumConnectToHostWaitTime);
+	m_timerForConnectToHostTimeOut->setSingleShot(true);
+	m_timerForConnectToHostTimeOut->start(m_connectSettings->maximumConnectToHostWaitTime);
 }
+
 void Connect::startTimerForSendPackageCheck() {
-	if (timerForSendPackageCheck_) {
+	if (m_timerForSendPackageCheck) {
 		qDebug() << "startTimerForSendPackageCheck: error, timer already started";
 		return;
 	}
-	if (connectSettings_->maximumSendPackageWaitTime == -1) {
+	if (m_connectSettings->maximumSendPackageWaitTime == -1) {
 		return;
 	}
-	timerForSendPackageCheck_.reset(new QTimer);
-	connect(timerForSendPackageCheck_.data(), &QTimer::timeout,
+	m_timerForSendPackageCheck.reset(new QTimer);
+	connect(m_timerForSendPackageCheck.data(), &QTimer::timeout,
 		this, &Connect::onSendPackageCheck,
 		Qt::DirectConnection);
-	timerForSendPackageCheck_->setSingleShot(true);
-	timerForSendPackageCheck_->start(1000);
+	m_timerForSendPackageCheck->setSingleShot(true);
+	m_timerForSendPackageCheck->start(1000);
 }
+
 void Connect::onDataTransportPackageReceived(const QSharedPointer<Package>& package) {
-	if ((package->randomFlag() >= connectSettings_->randomFlagRangeStart) &&
-		(package->randomFlag() < connectSettings_->randomFlagRangeEnd)) {
+	if ((package->randomFlag() >= m_connectSettings->randomFlagRangeStart) &&
+		(package->randomFlag() < m_connectSettings->randomFlagRangeEnd)) {
 		if (package->packageFlag() == NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG) {
 			this->onFileDataTransportPackageReceived(package, false);
 		}
-		auto it = onReceivedCallbacks_.find(package->randomFlag());
-		if (it == onReceivedCallbacks_.end()) {
+		auto it = m_onReceivedCallbacks.find(package->randomFlag());
+		if (it == m_onReceivedCallbacks.end()) {
 			return;
 		}
 		if (it->succeedCallback) {
-			NETWORK_NULLPTR_CHECK(connectSettings_->waitReplyPackageSucceedCallback);
-			connectSettings_->waitReplyPackageSucceedCallback(this, package, it->succeedCallback);
+			NETWORK_NULLPTR_CHECK(m_connectSettings->waitReplyPackageSucceedCallback);
+			m_connectSettings->waitReplyPackageSucceedCallback(this, package, it->succeedCallback);
 		}
-		onReceivedCallbacks_.erase(it);
+		m_onReceivedCallbacks.erase(it);
 	} else {
 		switch (package->packageFlag()) {
 		case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
 		{
-			NETWORK_NULLPTR_CHECK(connectSettings_->packageReceivedCallback);
-			connectSettings_->packageReceivedCallback(this, package);
+			NETWORK_NULLPTR_CHECK(m_connectSettings->packageReceivedCallback);
+			m_connectSettings->packageReceivedCallback(this, package);
 			break;
 		}
 		case NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG:
@@ -598,18 +618,19 @@ void Connect::onDataTransportPackageReceived(const QSharedPointer<Package>& pack
 		}
 	}
 }
+
 bool Connect::onFileDataTransportPackageReceived(
 	const QSharedPointer<Package>& package,
 	const bool& callbackOnFinish
 ) {
-	const auto&& itForPackage = receivedFilePackagePool_.find(package->randomFlag());
-	const auto&& packageIsCached = itForPackage != receivedFilePackagePool_.end();
+	const auto&& itForPackage = m_receivedFilePackagePool.find(package->randomFlag());
+	const auto&& packageIsCached = itForPackage != m_receivedFilePackagePool.end();
 	auto checkFinish = [this, packageIsCached, callbackOnFinish](const QSharedPointer<Package>& firstPackage,
 		QSharedPointer<QFile>& file)-> bool {
 			const auto&& fileSize = firstPackage->fileSize();
 			if (file->pos() != fileSize) {
 				if (!packageIsCached) {
-					this->receivedFilePackagePool_[firstPackage->randomFlag()] = { firstPackage, file };
+					this->m_receivedFilePackagePool[firstPackage->randomFlag()] = { firstPackage, file };
 				}
 				this->sendDataRequestToRemote(firstPackage);
 				return false;
@@ -623,20 +644,20 @@ bool Connect::onFileDataTransportPackageReceived(
 			utime(firstPackage->localFilePath().toLatin1().data(), &timeBuf);
 #endif
 			if (callbackOnFinish) {
-				NETWORK_NULLPTR_CHECK(this->connectSettings_->packageReceivedCallback, false);
-				this->connectSettings_->packageReceivedCallback(this, firstPackage);
+				NETWORK_NULLPTR_CHECK(this->m_connectSettings->packageReceivedCallback, false);
+				this->m_connectSettings->packageReceivedCallback(this, firstPackage);
 			}
 			return true;
 	};
 	if (packageIsCached) {
 		itForPackage.value().second->write(package->payloadData());
-		itForPackage.value().second->waitForBytesWritten(connectSettings_->maximumFileWriteWaitTime);
+		itForPackage.value().second->waitForBytesWritten(m_connectSettings->maximumFileWriteWaitTime);
 		return checkFinish(itForPackage.value().first, itForPackage.value().second);
 	}
 	const auto&& fileName = package->fileName();
 	const auto&& fileSize = package->fileSize();
-	NETWORK_NULLPTR_CHECK(connectSettings_->filePathProvider, false);
-	const auto&& localFilePath = connectSettings_->filePathProvider(this, package, fileName);
+	NETWORK_NULLPTR_CHECK(m_connectSettings->filePathProvider, false);
+	const auto&& localFilePath = m_connectSettings->filePathProvider(this, package, fileName);
 	if (localFilePath.isEmpty()) {
 		qDebug() << "Connect::onFileDataTransportPackageReceived: File path is empty, fileName:" << fileName;
 		return false;
@@ -658,42 +679,45 @@ bool Connect::onFileDataTransportPackageReceived(
 	}
 	package->setLocalFilePath(localFilePath);
 	file->write(package->payloadData());
-	file->waitForBytesWritten(connectSettings_->maximumFileWriteWaitTime);
+	file->waitForBytesWritten(m_connectSettings->maximumFileWriteWaitTime);
 	package->clearPayloadData();
 	return checkFinish(package, file);
 }
+
 void Connect::onReadyToDelete() {
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	isAbandonTcpSocket_ = true;
-	if (!timerForConnectToHostTimeOut_) {
-		timerForConnectToHostTimeOut_.clear();
+	m_isAbandonTcpSocket = true;
+	if (!m_timerForConnectToHostTimeOut) {
+		m_timerForConnectToHostTimeOut.clear();
 	}
-	if (!onReceivedCallbacks_.isEmpty()) {
-		for (const auto& callback : onReceivedCallbacks_) {
+	if (!m_onReceivedCallbacks.isEmpty()) {
+		for (const auto& callback : m_onReceivedCallbacks) {
 			if (!callback.failCallback) {
 				continue;
 			}
 			callback.failCallback(this);
 		}
 	}
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
-	tcpSocket_->close();
-	NETWORK_NULLPTR_CHECK(connectSettings_->readyToDeleteCallback);
-	connectSettings_->readyToDeleteCallback(this);
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
+	m_tcpSocket->close();
+	NETWORK_NULLPTR_CHECK(m_connectSettings->readyToDeleteCallback);
+	m_connectSettings->readyToDeleteCallback(this);
 }
+
 qint32 Connect::nextRandomFlag() {
-	mutexForSend_.lock();
-	if (sendRandomFlagRotaryIndex_ >= connectSettings_->randomFlagRangeEnd) {
-		sendRandomFlagRotaryIndex_ = connectSettings_->randomFlagRangeStart;
+	m_mutexForSend.lock();
+	if (m_sendRandomFlagRotaryIndex >= m_connectSettings->randomFlagRangeEnd) {
+		m_sendRandomFlagRotaryIndex = m_connectSettings->randomFlagRangeStart;
 	} else {
-		++sendRandomFlagRotaryIndex_;
+		++m_sendRandomFlagRotaryIndex;
 	}
-	const auto currentRandomFlag = sendRandomFlagRotaryIndex_;
-	mutexForSend_.unlock();
+	const auto currentRandomFlag = m_sendRandomFlagRotaryIndex;
+	m_mutexForSend.unlock();
 	return currentRandomFlag;
 }
+
 bool Connect::readySendPayloadData(
 	const qint32& randomFlag,
 	const QString& targetActionFlag,
@@ -707,7 +731,7 @@ bool Connect::readySendPayloadData(
 		payloadData,
 		appendData,
 		randomFlag,
-		connectSettings_->cutPackageSize,
+		m_connectSettings->cutPackageSize,
 		this->needCompressionPayloadData(payloadData.size())
 	);
 	if (packages.isEmpty()) {
@@ -717,6 +741,7 @@ bool Connect::readySendPayloadData(
 	this->readySendPackages(randomFlag, packages, succeedCallback, failCallback);
 	return true;
 }
+
 bool Connect::readySendFileData(
 	const qint32& randomFlag,
 	const QString& targetActionFlag,
@@ -725,7 +750,7 @@ bool Connect::readySendFileData(
 	const ConnectPointerAndPackageSharedPointerFunction& succeedCallback,
 	const ConnectPointerFunction& failCallback
 ) {
-	if (waitForSendFiles_.contains(randomFlag)) {
+	if (m_waitForSendFiles.contains(randomFlag)) {
 		qDebug() << "Connect::readySendFileData: file is sending, filePath:" << fileInfo.filePath();
 		return false;
 	}
@@ -738,9 +763,9 @@ bool Connect::readySendFileData(
 		qDebug() << "Connect::readySendFileData: file open error, filePath:" << fileInfo.filePath();
 		return false;
 	}
-	const auto&& fileData = file->read(connectSettings_->cutPackageSize);
+	const auto&& fileData = file->read(m_connectSettings->cutPackageSize);
 	if (!file->atEnd()) {
-		waitForSendFiles_[randomFlag] = file;
+		m_waitForSendFiles[randomFlag] = file;
 	}
 	auto packages = QList<QSharedPointer<Package>>(
 		{
@@ -757,6 +782,7 @@ bool Connect::readySendFileData(
 	this->readySendPackages(randomFlag, packages, succeedCallback, failCallback);
 	return true;
 }
+
 void Connect::readySendPackages(
 	const qint32& randomFlag,
 	QList<QSharedPointer<Package>>& packages,
@@ -764,7 +790,7 @@ void Connect::readySendPackages(
 	const ConnectPointerFunction& failCallback
 ) {
 	if (this->thread() != QThread::currentThread()) {
-		runOnConnectThreadCallback_(
+		m_runOnConnectThreadCallback(
 			[
 				this,
 				randomFlag,
@@ -781,22 +807,22 @@ void Connect::readySendPackages(
 	auto firstPackage = packages.first();
 	this->sendPackageToRemote(firstPackage);
 	if (succeedCallback || failCallback) {
-		onReceivedCallbacks_[randomFlag] =
+		m_onReceivedCallbacks[randomFlag] =
 		{
 			QDateTime::currentMSecsSinceEpoch(),
 			succeedCallback,
 			failCallback
 		};
-		if (!timerForSendPackageCheck_) {
+		if (!m_timerForSendPackageCheck) {
 			this->startTimerForSendPackageCheck();
 		}
 	}
 	if (packages.size() > 1) {
-		sendPayloadPackagePool_[randomFlag].swap(packages);
-		sendPayloadPackagePool_[randomFlag].pop_front();
+		m_sendPayloadPackagePool[randomFlag].swap(packages);
+		m_sendPayloadPackagePool[randomFlag].pop_front();
 	}
-	NETWORK_NULLPTR_CHECK(connectSettings_->packageSendingCallback);
-	connectSettings_->packageSendingCallback(
+	NETWORK_NULLPTR_CHECK(m_connectSettings->packageSendingCallback);
+	m_connectSettings->packageSendingCallback(
 		this,
 		randomFlag,
 		0,
@@ -804,11 +830,12 @@ void Connect::readySendPackages(
 		firstPackage->payloadDataTotalSize()
 	);
 }
+
 void Connect::sendDataRequestToRemote(const QSharedPointer<Package>& package) {
-	if (isAbandonTcpSocket_) {
+	if (m_isAbandonTcpSocket) {
 		return;
 	}
-	NETWORK_NULLPTR_CHECK(tcpSocket_);
+	NETWORK_NULLPTR_CHECK(m_tcpSocket);
 	switch (package->packageFlag()) {
 	case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
 	{
@@ -827,8 +854,9 @@ void Connect::sendDataRequestToRemote(const QSharedPointer<Package>& package) {
 	}
 	}
 }
+
 void Connect::sendPackageToRemote(const QSharedPointer<Package>& package) {
 	const auto&& buffer = package->toByteArray();
-	waitForSendBytes_ += buffer.size();
-	tcpSocket_->write(buffer);
+	m_waitForSendBytes += buffer.size();
+	m_tcpSocket->write(buffer);
 }
