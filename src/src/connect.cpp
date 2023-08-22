@@ -19,6 +19,7 @@
 #include <QNetworkProxy>
 
 #include "package.h"
+
 // ConnectSettings
 void ConnectSettings::setFilePathProviderToDefaultDir() {
 	const auto&& defaultDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
@@ -32,6 +33,7 @@ void ConnectSettings::setFilePathProviderToDir(const QDir& dir) {
 		return QString("%1/%2").arg(dir.path(), fileName);
 		};
 }
+
 // Connect
 Connect::Connect(const QSharedPointer<ConnectSettings>& connectSettings) :
 	m_connectSettings(connectSettings),
@@ -49,6 +51,7 @@ Connect::Connect(const QSharedPointer<ConnectSettings>& connectSettings) :
 			<< m_connectSettings->filePathProvider(QPointer<Connect>(nullptr),
 			QSharedPointer<Package>(nullptr), QString());
 	}
+
 #ifdef Q_OS_IOS
 	static bool flag = true;
 	if (flag) {
@@ -60,6 +63,7 @@ Connect::Connect(const QSharedPointer<ConnectSettings>& connectSettings) :
 	}
 #endif
 }
+
 void Connect::createConnect(
 	const std::function<void(const QSharedPointer<Connect>&)>& onConnectCreatedCallback,
 	const std::function<void(std::function<void()>)>& runOnConnectThreadCallback,

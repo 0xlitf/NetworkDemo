@@ -50,16 +50,16 @@ void NetworkThreadPoolHelper::onRun() {
 
 // NetworkThreadPool
 NetworkThreadPool::NetworkThreadPool(const int& threadCount) :
-	threadPool_(new QThreadPool),
-	eventLoops_(new QVector<QPointer<QEventLoop>>),
-	helpers_(new QVector<QPointer<NetworkThreadPoolHelper>>) {
-	threadPool_->setMaxThreadCount(threadCount);
-	eventLoops_->resize(threadCount);
-	helpers_->resize(threadCount);
+	m_threadPool(new QThreadPool),
+	m_eventLoops(new QVector<QPointer<QEventLoop>>),
+	m_helpers(new QVector<QPointer<NetworkThreadPoolHelper>>) {
+	m_threadPool->setMaxThreadCount(threadCount);
+	m_eventLoops->resize(threadCount);
+	m_helpers->resize(threadCount);
 	QSemaphore semaphoreForThreadStart;
 	for (auto index = 0; index < threadCount; ++index) {
 		QtConcurrent::run(
-			threadPool_.data(),
+			m_threadPool.data(),
 			[
 				this,
 				index,
@@ -67,8 +67,8 @@ NetworkThreadPool::NetworkThreadPool(const int& threadCount) :
 			]() {
 				QEventLoop eventLoop;
 				NetworkThreadPoolHelper helper;
-				(*this->eventLoops_)[index] = &eventLoop;
-				(*this->helpers_)[index] = &helper;
+				(*this->m_eventLoops)[index] = &eventLoop;
+				(*this->m_helpers)[index] = &helper;
 				semaphoreForThreadStart.release(1);
 				eventLoop.exec();
 			}
@@ -78,28 +78,25 @@ NetworkThreadPool::NetworkThreadPool(const int& threadCount) :
 }
 
 NetworkThreadPool::~NetworkThreadPool() {
-	for (const auto& eventLoop : *eventLoops_) {
+	for (const auto& eventLoop : *m_eventLoops) {
 		QMetaObject::invokeMethod(eventLoop.data(), "quit");
 	}
-	threadPool_->waitForDone();
+	m_threadPool->waitForDone();
 }
 
 int NetworkThreadPool::run(const std::function<void()>& callback, const int& threadIndex) {
 	if (threadIndex == -1) {
-		rotaryIndex_ = (rotaryIndex_ + 1) % helpers_->size();
+		m_rotaryIndex = (m_rotaryIndex + 1) % m_helpers->size();
 	}
-	const auto index = (threadIndex == -1) ? (rotaryIndex_) : (threadIndex);
-	(*helpers_)[index]->run(callback);
+	const auto index = (threadIndex == -1) ? (m_rotaryIndex) : (threadIndex);
+	(*m_helpers)[index]->run(callback);
 	return index;
 }
 
 int NetworkThreadPool::waitRun(const std::function<void()>& callback, const int& threadIndex) {
 	QSemaphore semaphore;
 	auto index = this->run(
-		[
-			&semaphore,
-			&callback
-		]() {
+		[&semaphore, &callback]() {
 			callback();
 			semaphore.release(1);
 		},

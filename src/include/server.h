@@ -12,12 +12,9 @@ struct ServerSettings {
 	std::function<void(const QPointer<Connect>&)> connectToHostSucceedCallback = nullptr;
 	std::function<void(const QPointer<Connect>&)> remoteHostClosedCallback = nullptr;
 	std::function<void(const QPointer<Connect>&)> readyToDeleteCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const qint32&, const qint64&, const qint64&, const qint64&)>
-		packageSendingCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const qint32&, const qint64&, const qint64&, const qint64&)>
-		packageReceivingCallback = nullptr;
-	std::function<void(const QPointer<Connect>&, const QSharedPointer<Package>&)> packageReceivedCallback =
-		nullptr;
+	std::function<void(const QPointer<Connect>&, const qint32&, const qint64&, const qint64&, const qint64&)> packageSendingCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const qint32&, const qint64&, const qint64&, const qint64&)> packageReceivingCallback = nullptr;
+	std::function<void(const QPointer<Connect>&, const QSharedPointer<Package>&)> packageReceivedCallback =	nullptr;
 	int globalServerThreadCount = 1;
 	int globalSocketThreadCount = NETWORK_ADVISE_THREADCOUNT;
 	int globalCallbackThreadCount = NETWORK_ADVISE_THREADCOUNT;
