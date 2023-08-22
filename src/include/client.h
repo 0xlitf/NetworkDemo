@@ -23,11 +23,13 @@ struct ClientSettings {
 class Client : public QObject {
 	Q_OBJECT;
 	Q_DISABLE_COPY(Client)
+
 public:
 	Client(
 		const QSharedPointer<ClientSettings>& clientSettings,
 		QSharedPointer<ConnectPoolSettings> connectPoolSettings,
 		QSharedPointer<ConnectSettings> connectSettings);
+
 	~Client() override;
 
 	static QSharedPointer<Client> createClient(const bool& fileTransferEnabled = false);

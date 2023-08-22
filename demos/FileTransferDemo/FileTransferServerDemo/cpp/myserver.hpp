@@ -6,13 +6,17 @@
 #include <QDir>
 
 #include "network.h"
+
 class MyServer : public Processor {
 public:
-	Q_OBJECT
+	Q_OBJECT;
 	Q_DISABLE_COPY(MyServer)
+
 public:
 	MyServer() = default;
+
 	~MyServer() override = default;
+
 	bool begin() {
 		// 创建一个服务端
 		m_server = Server::createServer(26432, QHostAddress::Any, true);
@@ -29,6 +33,7 @@ public:
 		qDebug() << "MyServer: begin succeed";
 		return true;
 	}
+
 	// 用于处理的函数必须是槽函数
 public slots:
 	void fileTransfer(const QFileInfo& received, QVariantMap& send) {
@@ -39,6 +44,7 @@ public slots:
 		send["succeed"] = true;
 		send["message"] = "";
 	}
+
 private:
 	QSharedPointer<Server> m_server;
 };

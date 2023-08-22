@@ -3,65 +3,74 @@
 #define NETWORK_INCLUDE_NETWORK_PROCESSOR_H_
 
 #include "foundation.h"
-#define NP_PRINTFUNCTION()                                                            \
+
+#define NP_PRINTFUNCTION()                                                              \
     {                                                                                   \
         const auto &&buffer = QString( Q_FUNC_INFO );                                   \
         const auto &&indexForEnd = buffer.indexOf( '(' );                               \
         const auto functionName = buffer.mid( 0, indexForEnd ).remove( QStringLiteral( "bool " ) ); \
         qDebug() << functionName.toLocal8Bit().data();                                  \
     }
-#define NP_PRINTRECEIVED()                                                            \
+
+#define NP_PRINTRECEIVED()                                                              \
     {                                                                                   \
         const auto &&buffer = QString( Q_FUNC_INFO );                                   \
         const auto &&indexForEnd = buffer.indexOf( '(' );                               \
         const auto functionName = buffer.mid( 0, indexForEnd ).remove( QStringLiteral( "bool " ) ); \
         qDebug() << ( functionName + ": received:" ).toLocal8Bit().data() << received;  \
     }
-#define NP_SUCCEED()                                                                  \
+
+#define NP_SUCCEED()                                                                    \
     send[ QStringLiteral( "succeed" ) ] = true;                                         \
     send[ QStringLiteral( "message" ) ] = "";                                           \
     return true;
-#define NP_FAIL( errorMessage )                                                       \
+
+#define NP_FAIL( errorMessage )                                                         \
     send[ QStringLiteral( "succeed" ) ] = false;                                        \
     send[ QStringLiteral( "message" ) ] = errorMessage;                                 \
     return false;
-#define NP_SERVERFAIL( errorMessage )                                                 \
+
+#define NP_SERVERFAIL( errorMessage )                                                   \
     const auto &&message = QStringLiteral( ": Server error: " ) + errorMessage;         \
     qDebug() << QString( Q_FUNC_INFO ).remove( "bool " ).toLocal8Bit().data()           \
              << message.toLocal8Bit().data();                                           \
     send[ QStringLiteral( "succeed" ) ] = false;                                        \
     send[ QStringLiteral( "message" ) ] = errorMessage;                                 \
     return false;
-#define NP_CHECKRECEIVEDDATACONTAINS( ... )                                           \
+
+#define NP_CHECKRECEIVEDDATACONTAINS( ... )                                             \
     if (                                                                                \
-        !Processor::checkMapContains(                                          \
+        !Processor::checkMapContains(                                                   \
             { __VA_ARGS__ },                                                            \
             received,                                                                   \
             send                                                                        \
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDDATACONTAINSANDNOT0( ... )                                    \
+
+#define NP_CHECKRECEIVEDDATACONTAINSANDNOT0( ... )                                      \
     if (                                                                                \
-        !Processor::checkMapContainsAndNot0(                                   \
+        !Processor::checkMapContainsAndNot0(                                            \
             { __VA_ARGS__ },                                                            \
             received,                                                                   \
             send                                                                        \
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDDATACONTAINSANDNOTEMPTY( ... )                                \
+
+#define NP_CHECKRECEIVEDDATACONTAINSANDNOTEMPTY( ... )                                  \
     if (                                                                                \
-        !Processor::checkMapContainsAndNotEmpty(                               \
+        !Processor::checkMapContainsAndNotEmpty(                                        \
             { __VA_ARGS__ },                                                            \
             received,                                                                   \
             send                                                                        \
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDDATACONTAINSEXPECTEDCONTENT( key, ... )                       \
+
+#define NP_CHECKRECEIVEDDATACONTAINSEXPECTEDCONTENT( key, ... )                         \
     if (                                                                                \
-        !Processor::checkDataContasinsExpectedContent(                         \
+        !Processor::checkDataContasinsExpectedContent(                                  \
             key,                                                                        \
             __VA_ARGS__,                                                                \
             received,                                                                   \
@@ -69,36 +78,40 @@
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDAPPENDDATACONTAINS( ... )                                     \
+
+#define NP_CHECKRECEIVEDAPPENDDATACONTAINS( ... )                                       \
     if (                                                                                \
-        !Processor::checkMapContains(                                          \
+        !Processor::checkMapContains(                                                   \
             { __VA_ARGS__ },                                                            \
             receivedAppend,                                                             \
             send                                                                        \
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDAPPENDDATACONTAINSANDNOT0( ... )                              \
+
+#define NP_CHECKRECEIVEDAPPENDDATACONTAINSANDNOT0( ... )                                \
     if (                                                                                \
-        !Processor::checkMapContainsAndNot0(                                   \
+        !Processor::checkMapContainsAndNot0(                                            \
             { __VA_ARGS__ },                                                            \
             receivedAppend,                                                             \
             send                                                                        \
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDAPPENDDATACONTAINSANDNOTEMPTY( ... )                          \
+
+#define NP_CHECKRECEIVEDAPPENDDATACONTAINSANDNOTEMPTY( ... )                            \
     if (                                                                                \
-        !Processor::checkMapContainsAndNotEmpty(                               \
+        !Processor::checkMapContainsAndNotEmpty(                                        \
             { __VA_ARGS__ },                                                            \
             receivedAppend,                                                             \
             send                                                                        \
         )                                                                               \
     )                                                                                   \
     { return false; }
-#define NP_CHECKRECEIVEDAPPENDDATACONTAINSEXPECTEDCONTENT( key, ... )                 \
+
+#define NP_CHECKRECEIVEDAPPENDDATACONTAINSEXPECTEDCONTENT( key, ... )                   \
     if (                                                                                \
-        !Processor::checkDataContasinsExpectedContent(                         \
+        !Processor::checkDataContasinsExpectedContent(                                  \
             key,                                                                        \
             __VA_ARGS__,                                                                \
             receivedAppend,                                                             \
@@ -106,6 +119,7 @@
         )                                                                               \
     )                                                                                   \
     { return false; }
+
 class Processor : public QObject {
 	Q_OBJECT
 		Q_DISABLE_COPY(Processor)

@@ -55,8 +55,8 @@ void ConnectPool::createConnect(
 	Connect::createConnect(
 		[
 			this,
-			connectKey,
-			hostName
+				connectKey,
+				hostName
 		](const auto& connect) {
 			this->mutex_.lock();
 			this->m_connectForConnecting[connect.data()] = connect;
@@ -64,11 +64,11 @@ void ConnectPool::createConnect(
 			this->m_bimapForHostAndPort2[connect.data()] = connectKey;
 			this->mutex_.unlock();
 		},
-		runOnConnectThreadCallback,
-		m_connectSettings,
-		hostName,
-		port
-	);
+				runOnConnectThreadCallback,
+				m_connectSettings,
+				hostName,
+				port
+				);
 }
 
 void ConnectPool::createConnect(
@@ -84,7 +84,7 @@ void ConnectPool::createConnect(
 	Connect::createConnect(
 		[
 			this,
-			socketDescriptor
+				socketDescriptor
 		](const auto& connect) {
 			this->mutex_.lock();
 			this->m_connectForConnecting[connect.data()] = connect;
@@ -92,10 +92,10 @@ void ConnectPool::createConnect(
 			this->m_bimapForSocketDescriptor2[connect.data()] = socketDescriptor;
 			this->mutex_.unlock();
 		},
-		runOnConnectThreadCallback,
-		m_connectSettings,
-		socketDescriptor
-	);
+				runOnConnectThreadCallback,
+				m_connectSettings,
+				socketDescriptor
+				);
 }
 
 QPair<QString, quint16> ConnectPool::getHostAndPortByConnect(const QPointer<Connect>& connect) {

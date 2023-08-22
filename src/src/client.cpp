@@ -108,9 +108,9 @@ bool Client::begin() {
 			connectSettings->randomFlagRangeEnd = 999999999;
 			m_connectPools[QThread::currentThread()] = QSharedPointer<ConnectPool>(
 				new ConnectPool(
-					connectPoolSettings,
-					connectSettings
-				)
+				connectPoolSettings,
+				connectSettings
+			)
 			);
 		}
 			);

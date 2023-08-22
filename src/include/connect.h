@@ -39,6 +39,7 @@ struct ConnectSettings {
 	void setFilePathProviderToDefaultDir();
 	void setFilePathProviderToDir(const QDir& dir);
 };
+
 class Connect : public QObject {
 	Q_OBJECT;
 	Q_DISABLE_COPY(Connect)

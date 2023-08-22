@@ -3,6 +3,7 @@
 #define NETWORK_INCLUDE_NETWORK_CONNECTPOOL_H_
 
 #include "foundation.h"
+
 struct ConnectPoolSettings {
 	std::function<void(const QPointer<Connect>&, const QPointer<ConnectPool>&)> connectToHostErrorCallback = nullptr;
 	std::function<void(const QPointer<Connect>&, const QPointer<ConnectPool>&)> connectToHostTimeoutCallback = nullptr;
@@ -15,6 +16,7 @@ struct ConnectPoolSettings {
 	std::function<void(const QPointer<Connect>&, const QPointer<ConnectPool>&, const QSharedPointer<Package>&, const ConnectPointerAndPackageSharedPointerFunction&)> waitReplyPackageSucceedCallback = nullptr;
 	std::function<void(const QPointer<Connect>&, const QPointer<ConnectPool>&, const ConnectPointerFunction&)> waitReplyPackageFailCallback = nullptr;
 };
+
 class ConnectPool : public QObject {
 	Q_OBJECT;
 	Q_DISABLE_COPY(ConnectPool)

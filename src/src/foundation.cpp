@@ -130,9 +130,7 @@ NetworkNodeMark::NetworkNodeMark(const QString& dutyMark) :
 			QString::number(m_nodeMarkCreatedTime),
 			m_nodeMarkClassAddress,
 			m_dutyMark
-		).toUtf8(),
-		QCryptographicHash::Md5
-	).toHex();
+		).toUtf8(), QCryptographicHash::Md5).toHex();
 }
 
 QString NetworkNodeMark::calculateNodeMarkSummary(const QString& dutyMark) {

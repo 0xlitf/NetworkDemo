@@ -18,9 +18,7 @@ Lan::Lan(const QSharedPointer<LanSettings>& lanSettings) :
 
 Lan::~Lan() {
 	m_processorThreadPool->waitRun(
-		[
-			this
-		]() {
+		[this]() {
 			m_mutex.lock();
 			this->sendOffline();
 			QThread::msleep(100);
@@ -33,15 +31,13 @@ Lan::~Lan() {
 			}
 			m_availableLanNodes.clear();
 			m_mutex.unlock();
-		}
-			);
+		});
 }
 
 QSharedPointer<Lan> Lan::createLan(
 	const QHostAddress& multicastGroupAddress,
 	const quint16& bindPort,
-	const QString& dutyMark
-) {
+	const QString& dutyMark) {
 	QSharedPointer<LanSettings> lanSettings(new LanSettings);
 	lanSettings->dutyMark = dutyMark;
 	lanSettings->multicastGroupAddress = multicastGroupAddress;
@@ -245,18 +241,23 @@ void Lan::onUdpSocketReadyRead() {
 			qDebug() << "Lan::onUdpSocketReadyRead: error data1:" << datagram;
 			continue;
 		}
+
 		if (!dataPackageIndex) {
 			qDebug() << "Lan::onUdpSocketReadyRead: error data2:" << datagram;
 			continue;
 		}
+
 		QList<QHostAddress> ipList;
+
 		for (const auto& ip : data["ipList"].toList()) {
 			ipList.push_back(QHostAddress(ip.toString()));
 		}
+
 		if (ipList.isEmpty()) {
 			qDebug() << "Lan::onUdpSocketReadyRead: error data3:" << datagram;
 			continue;
 		}
+
 		if (!requestOffline) {
 			m_mutex.lock();
 			LanNode lanNode;

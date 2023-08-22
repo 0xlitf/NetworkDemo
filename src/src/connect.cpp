@@ -24,13 +24,13 @@ void ConnectSettings::setFilePathProviderToDefaultDir() {
 	const auto&& defaultDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 	filePathProvider = [defaultDir](const auto&, const auto&, const auto& fileName) {
 		return QString("%1/NetworkReceivedFile/%2").arg(defaultDir, fileName);
-	};
+		};
 }
 
 void ConnectSettings::setFilePathProviderToDir(const QDir& dir) {
 	filePathProvider = [dir](const auto&, const auto&, const auto& fileName) {
 		return QString("%1/%2").arg(dir.path(), fileName);
-	};
+		};
 }
 // Connect
 Connect::Connect(const QSharedPointer<ConnectSettings>& connectSettings) :
@@ -47,7 +47,7 @@ Connect::Connect(const QSharedPointer<ConnectSettings>& connectSettings) :
 		m_connectSettings->setFilePathProviderToDefaultDir();
 		qDebug() << "Connect: fileTransfer is enabled, but filePathProvider is null, use default dir:"
 			<< m_connectSettings->filePathProvider(QPointer<Connect>(nullptr),
-				QSharedPointer<Package>(nullptr), QString());
+			QSharedPointer<Package>(nullptr), QString());
 	}
 #ifdef Q_OS_IOS
 	static bool flag = true;
@@ -302,60 +302,60 @@ void Connect::onTcpSocketStateChanged() {
 	const auto&& state = m_tcpSocket->state();
 	//    qDebug() << "onTcpSocketStateChanged:" << this << ": state:" << state;
 	switch (state) {
-	case QAbstractSocket::ConnectedState:
-	{
-		if (!m_timerForConnectToHostTimeOut.isNull()) {
-			m_timerForConnectToHostTimeOut.clear();
-		}
-		NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostSucceedCallback);
-		m_connectSettings->connectToHostSucceedCallback(this);
-		m_onceConnectSucceed = true;
-		m_connectSucceedTime = QDateTime::currentMSecsSinceEpoch();
-		break;
-	}
-	case QAbstractSocket::UnconnectedState:
-	{
-		//            qDebug() << "onTcpSocketStateChanged:" << this << ": UnconnectedState: error:" << tcpSocket_->error();
-		switch (m_tcpSocket->error()) {
-		case QAbstractSocket::UnknownSocketError:
+		case QAbstractSocket::ConnectedState:
 		{
-			if (m_onceConnectSucceed) {
-				break;
+			if (!m_timerForConnectToHostTimeOut.isNull()) {
+				m_timerForConnectToHostTimeOut.clear();
 			}
-			NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostErrorCallback);
-			m_connectSettings->connectToHostErrorCallback(this);
+			NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostSucceedCallback);
+			m_connectSettings->connectToHostSucceedCallback(this);
+			m_onceConnectSucceed = true;
+			m_connectSucceedTime = QDateTime::currentMSecsSinceEpoch();
 			break;
 		}
-		case QAbstractSocket::RemoteHostClosedError:
+		case QAbstractSocket::UnconnectedState:
 		{
-			NETWORK_NULLPTR_CHECK(m_connectSettings->remoteHostClosedCallback);
-			m_connectSettings->remoteHostClosedCallback(this);
-			break;
-		}
-		case QAbstractSocket::HostNotFoundError:
-		case QAbstractSocket::ConnectionRefusedError:
-		{
-			NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostErrorCallback);
-			m_connectSettings->connectToHostErrorCallback(this);
-			break;
-		}
-		case QAbstractSocket::NetworkError:
-		{
+			//            qDebug() << "onTcpSocketStateChanged:" << this << ": UnconnectedState: error:" << tcpSocket_->error();
+			switch (m_tcpSocket->error()) {
+				case QAbstractSocket::UnknownSocketError:
+				{
+					if (m_onceConnectSucceed) {
+						break;
+					}
+					NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostErrorCallback);
+					m_connectSettings->connectToHostErrorCallback(this);
+					break;
+				}
+				case QAbstractSocket::RemoteHostClosedError:
+				{
+					NETWORK_NULLPTR_CHECK(m_connectSettings->remoteHostClosedCallback);
+					m_connectSettings->remoteHostClosedCallback(this);
+					break;
+				}
+				case QAbstractSocket::HostNotFoundError:
+				case QAbstractSocket::ConnectionRefusedError:
+				{
+					NETWORK_NULLPTR_CHECK(m_connectSettings->connectToHostErrorCallback);
+					m_connectSettings->connectToHostErrorCallback(this);
+					break;
+				}
+				case QAbstractSocket::NetworkError:
+				{
+					break;
+				}
+				default:
+				{
+					qDebug() << "onTcpSocketStateChanged: unknow error:" << m_tcpSocket->error();
+					break;
+				}
+			}
+			this->onReadyToDelete();
 			break;
 		}
 		default:
 		{
-			qDebug() << "onTcpSocketStateChanged: unknow error:" << m_tcpSocket->error();
 			break;
 		}
-		}
-		this->onReadyToDelete();
-		break;
-	}
-	default:
-	{
-		break;
-	}
 	}
 }
 
@@ -598,23 +598,23 @@ void Connect::onDataTransportPackageReceived(const QSharedPointer<Package>& pack
 		m_onReceivedCallbacks.erase(it);
 	} else {
 		switch (package->packageFlag()) {
-		case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
-		{
-			NETWORK_NULLPTR_CHECK(m_connectSettings->packageReceivedCallback);
-			m_connectSettings->packageReceivedCallback(this, package);
-			break;
-		}
-		case NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG:
-		{
-			this->onFileDataTransportPackageReceived(package, true);
-			break;
-		}
-		default:
-		{
-			qDebug() << "Connect::onDataTransportPackageReceived: Unknow packageFlag:" << package->
-				packageFlag();
-			break;
-		}
+			case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
+			{
+				NETWORK_NULLPTR_CHECK(m_connectSettings->packageReceivedCallback);
+				m_connectSettings->packageReceivedCallback(this, package);
+				break;
+			}
+			case NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG:
+			{
+				this->onFileDataTransportPackageReceived(package, true);
+				break;
+			}
+			default:
+			{
+				qDebug() << "Connect::onDataTransportPackageReceived: Unknow packageFlag:" << package->
+					packageFlag();
+				break;
+			}
 		}
 	}
 }
@@ -648,7 +648,7 @@ bool Connect::onFileDataTransportPackageReceived(
 				this->m_connectSettings->packageReceivedCallback(this, firstPackage);
 			}
 			return true;
-	};
+		};
 	if (packageIsCached) {
 		itForPackage.value().second->write(package->payloadData());
 		itForPackage.value().second->waitForBytesWritten(m_connectSettings->maximumFileWriteWaitTime);
@@ -793,15 +793,15 @@ void Connect::readySendPackages(
 		m_runOnConnectThreadCallback(
 			[
 				this,
-				randomFlag,
-				packages,
-				succeedCallback,
-				failCallback
+					randomFlag,
+					packages,
+					succeedCallback,
+					failCallback
 			]() {
 				auto buf = packages;
 				this->readySendPackages(randomFlag, buf, succeedCallback, failCallback);
 			}
-		);
+				);
 		return;
 	}
 	auto firstPackage = packages.first();
@@ -837,21 +837,21 @@ void Connect::sendDataRequestToRemote(const QSharedPointer<Package>& package) {
 	}
 	NETWORK_NULLPTR_CHECK(m_tcpSocket);
 	switch (package->packageFlag()) {
-	case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
-	{
-		this->sendPackageToRemote(Package::createPayloadDataRequestPackage(package->randomFlag()));
-		break;
-	}
-	case NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG:
-	{
-		this->sendPackageToRemote(Package::createFileDataRequestPackage(package->randomFlag()));
-		break;
-	}
-	default:
-	{
-		qDebug() << "Connect::realSendDataRequest: Unknow packageFlag:" << package->packageFlag();
-		break;
-	}
+		case NETWORKPACKAGE_PAYLOADDATATRANSPORTPACKGEFLAG:
+		{
+			this->sendPackageToRemote(Package::createPayloadDataRequestPackage(package->randomFlag()));
+			break;
+		}
+		case NETWORKPACKAGE_FILEDATATRANSPORTPACKGEFLAG:
+		{
+			this->sendPackageToRemote(Package::createFileDataRequestPackage(package->randomFlag()));
+			break;
+		}
+		default:
+		{
+			qDebug() << "Connect::realSendDataRequest: Unknow packageFlag:" << package->packageFlag();
+			break;
+		}
 	}
 }
 

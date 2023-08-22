@@ -134,6 +134,7 @@ private:
 		if (!m_serverSettings->packageSendingCallback) {
 			return;
 		}
+
 		m_callbackThreadPool->run(
 			[connect,
 			callback = m_serverSettings->packageSendingCallback,
@@ -151,21 +152,18 @@ private:
 		const qint32& randomFlag,
 		const qint64& payloadCurrentIndex,
 		const qint64& payloadCurrentSize,
-		const qint64& payloadTotalSize
-	) {
+		const qint64& payloadTotalSize) {
 		if (!m_serverSettings->packageReceivingCallback) { return; }
 		m_callbackThreadPool->run(
-			[
-				connect,
-					callback = m_serverSettings->packageReceivingCallback,
-					randomFlag,
-					payloadCurrentIndex,
-					payloadCurrentSize,
-					payloadTotalSize
-			]() {
+			[connect,
+			callback = m_serverSettings->packageReceivingCallback,
+			randomFlag,
+			payloadCurrentIndex,
+			payloadCurrentSize,
+			payloadTotalSize]() {
 				callback(connect, randomFlag, payloadCurrentIndex, payloadCurrentSize, payloadTotalSize);
 			}
-				);
+		);
 	}
 
 	void onPackageReceived(

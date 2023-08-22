@@ -17,9 +17,11 @@
 #include <QSharedPointer>
 #include <functional>
 #include "qobjectdefs.h"
+
 using Test = std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/& sendArg)>;
 // Processor
 QSet<QString> Processor::exceptionSlots_({ "deleteLater", "_q_reregisterTimers" });
+
 Processor::Processor(const bool& invokeMethodByProcessorThread) :
 	invokeMethodByProcessorThread_(invokeMethodByProcessorThread) {
 	static bool flag = true;
@@ -28,6 +30,7 @@ Processor::Processor(const bool& invokeMethodByProcessorThread) :
 		qRegisterMetaType<QVariantMap>("QVariantMap");
 	}
 }
+
 QSet<QString> Processor::availableSlots() {
 	if (!availableSlots_.isEmpty()) {
 		return availableSlots_;
@@ -72,38 +75,38 @@ QSet<QString> Processor::availableSlots() {
 					}));
 				receiveArgumentMaker.reset(
 					new std::function<QGenericArgument(const std::shared_ptr<void>&receivedArg,
-						const QSharedPointer<Package> & package)>(
-							[](const auto& receivedArg, const auto& package) {
-								(*static_cast<QByteArray*>(receivedArg.get())) = package->payloadData();
-								qDebug() << "receivedArg.get(): " << *static_cast<const QByteArray*>(receivedArg.get());
-								return QArgument<const QByteArray&>("const QByteArray&",
-									*static_cast<const QByteArray*>(receivedArg.get()));
-							}));
+					const QSharedPointer<Package> &package)>(
+					[](const auto& receivedArg, const auto& package) {
+						(*static_cast<QByteArray*>(receivedArg.get())) = package->payloadData();
+						qDebug() << "receivedArg.get(): " << *static_cast<const QByteArray*>(receivedArg.get());
+						return QArgument<const QByteArray&>("const QByteArray&",
+							*static_cast<const QByteArray*>(receivedArg.get()));
+					}));
 			} else if (currentSum == "QVariantMap:received") {
 				receiveArgumentPreparer.reset(new std::function<std::shared_ptr<void>/*NetworkVoidSharedPointer*/()>([]() {
 					return std::shared_ptr<void>/*NetworkVoidSharedPointer*/(new QVariantMap, &Processor::deleteVariantMap);
 					}));
 				receiveArgumentMaker.reset(
 					new std::function<QGenericArgument(const std::shared_ptr<void>&receivedArg,
-						const QSharedPointer<Package> & package)>(
-							[](const auto& receivedArg, const auto& package) {
-								(*static_cast<QVariantMap*>(receivedArg.get())) = QJsonDocument::fromJson(
-									package->payloadData()).object().toVariantMap();
-								return QArgument<const QVariantMap&>("const QVariantMap&",
-									*static_cast<const QVariantMap*>(receivedArg.get()));
-							}));
+					const QSharedPointer<Package> &package)>(
+					[](const auto& receivedArg, const auto& package) {
+						(*static_cast<QVariantMap*>(receivedArg.get())) = QJsonDocument::fromJson(
+							package->payloadData()).object().toVariantMap();
+						return QArgument<const QVariantMap&>("const QVariantMap&",
+							*static_cast<const QVariantMap*>(receivedArg.get()));
+					}));
 			} else if (currentSum == "QFileInfo:received") {
 				receiveArgumentPreparer.reset(new std::function<std::shared_ptr<void>/*NetworkVoidSharedPointer*/()>([]() {
 					return std::shared_ptr<void>/*NetworkVoidSharedPointer*/(new QFileInfo, &Processor::deleteFileInfo);
 					}));
 				receiveArgumentMaker.reset(
 					new std::function<QGenericArgument(const std::shared_ptr<void>&receivedArg,
-						const QSharedPointer<Package> & package)>(
-							[](const auto& receivedArg, const auto& package) {
-								(*static_cast<QFileInfo*>(receivedArg.get())) = QFileInfo(package->localFilePath());
-								return QArgument<const QFileInfo&>("const QFileInfo&",
-									*static_cast<const QFileInfo*>(receivedArg.get()));
-							}));
+					const QSharedPointer<Package> &package)>(
+					[](const auto& receivedArg, const auto& package) {
+						(*static_cast<QFileInfo*>(receivedArg.get())) = QFileInfo(package->localFilePath());
+						return QArgument<const QFileInfo&>("const QFileInfo&",
+							*static_cast<const QFileInfo*>(receivedArg.get()));
+					}));
 			} else if (!method.parameterNames()[0].isEmpty()) {
 				qDebug() << "Processor::availableSlots: Unknow argument:" << currentSum;
 				continue;
@@ -121,115 +124,115 @@ QSet<QString> Processor::availableSlots() {
 						return QArgument<QByteArray&>("QByteArray&", *static_cast<QByteArray*>(sendArg.get()));
 					}));
 				sendArgumentAnswer.reset(new std::function<void(
-					const QPointer<Connect> & connect,
-					const QSharedPointer<Package> & package,
-					const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & sendArg,
+					const QPointer<Connect> &connect,
+					const QSharedPointer<Package> &package,
+					const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &sendArg,
 					const QVariantMap & sendAppend
-					)>([](
-						const auto& connect,
-						const auto& package,
-						const auto& sendArg,
-						const auto& sendAppend
-						) {
-							if (!connect) {
-								qDebug() << "Processor::availableSlots: connect is null";
-								return;
-							}
-							if (!package->randomFlag()) {
-								qDebug() <<
-									"Processor::availableSlots: when the randomFlag is 0, the reply is not allowed";
-								return;
-							}
-							const auto&& replyReply = connect->replyPayloadData(
-								package->randomFlag(),
-								*static_cast<QByteArray*>(sendArg.get()),
-								sendAppend
-							);
-							if (!replyReply) {
-								qDebug() << "Processor::availableSlots: replyPayloadData error";
-							}
-						}));
+				)>([](
+					const auto& connect,
+					const auto& package,
+					const auto& sendArg,
+					const auto& sendAppend
+				) {
+					if (!connect) {
+						qDebug() << "Processor::availableSlots: connect is null";
+						return;
+					}
+					if (!package->randomFlag()) {
+						qDebug() <<
+							"Processor::availableSlots: when the randomFlag is 0, the reply is not allowed";
+						return;
+					}
+					const auto&& replyReply = connect->replyPayloadData(
+						package->randomFlag(),
+						*static_cast<QByteArray*>(sendArg.get()),
+						sendAppend
+					);
+					if (!replyReply) {
+						qDebug() << "Processor::availableSlots: replyPayloadData error";
+					}
+					}));
 			} else if (currentSum == "QVariantMap&:send") {
 				sendArgumentPreparer.reset(new std::function<std::shared_ptr<void>/*NetworkVoidSharedPointer*/()>([]() {
 					return std::shared_ptr<void>/*NetworkVoidSharedPointer*/(new QVariantMap, &Processor::deleteVariantMap);
 					}));
-				sendArgumentMaker.reset(new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & sendArg)>(
+				sendArgumentMaker.reset(new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &sendArg)>(
 					[](const auto& sendArg) {
 						return QArgument<QVariantMap&>("QVariantMap&", *static_cast<QVariantMap*>(sendArg.get()));
 					}));
 				sendArgumentAnswer.reset(new std::function<void(
-					const QPointer<Connect> & connect,
-					const QSharedPointer<Package> & package,
-					const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & sendArg,
+					const QPointer<Connect> &connect,
+					const QSharedPointer<Package> &package,
+					const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &sendArg,
 					const QVariantMap & sendAppend
-					)>([](
-						const auto& connect,
-						const auto& package,
-						const auto& sendArg,
-						const auto& sendAppend
-						) {
-							if (!connect) {
-								qDebug() << "Processor::availableSlots: connect is null";
-								return;
-							}
-							if (!package->randomFlag()) {
-								qDebug() <<
-									"Processor::availableSlots: when the randomFlag is 0, the reply is not allowed";
-								return;
-							}
-							const auto&& replyReply = connect->replyPayloadData(
-								package->randomFlag(),
-								QJsonDocument(QJsonObject::fromVariantMap(*static_cast<QVariantMap*>(sendArg.get()))).
-								toJson(QJsonDocument::Compact),
-								sendAppend
-							);
-							if (!replyReply) {
-								qDebug() << "Processor::availableSlots: replyPayloadData error";
-							}
-						}));
+				)>([](
+					const auto& connect,
+					const auto& package,
+					const auto& sendArg,
+					const auto& sendAppend
+				) {
+					if (!connect) {
+						qDebug() << "Processor::availableSlots: connect is null";
+						return;
+					}
+					if (!package->randomFlag()) {
+						qDebug() <<
+							"Processor::availableSlots: when the randomFlag is 0, the reply is not allowed";
+						return;
+					}
+					const auto&& replyReply = connect->replyPayloadData(
+						package->randomFlag(),
+						QJsonDocument(QJsonObject::fromVariantMap(*static_cast<QVariantMap*>(sendArg.get()))).
+						toJson(QJsonDocument::Compact),
+						sendAppend
+					);
+					if (!replyReply) {
+						qDebug() << "Processor::availableSlots: replyPayloadData error";
+					}
+					}));
 			} else if (currentSum == "QFileInfo&:send") {
 				sendArgumentPreparer.reset(new std::function<std::shared_ptr<void>/*NetworkVoidSharedPointer*/()>([]() {
 					return std::shared_ptr<void>/*NetworkVoidSharedPointer*/(new QFileInfo, &Processor::deleteFileInfo);
 					}));
-				sendArgumentMaker.reset(new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & sendArg)>(
+				sendArgumentMaker.reset(new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &sendArg)>(
 					[](const auto& sendArg) {
 						return QArgument<QFileInfo&>("QFileInfo&", *static_cast<QFileInfo*>(sendArg.get()));
 					}));
 				sendArgumentAnswer.reset(new std::function<void(
-					const QPointer<Connect> & connect,
-					const QSharedPointer<Package> & package,
-					const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & sendArg,
+					const QPointer<Connect> &connect,
+					const QSharedPointer<Package> &package,
+					const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &sendArg,
 					const QVariantMap & sendAppend
-					)>([](
-						const auto& connect,
-						const auto& package,
-						const auto& sendArg,
-						const auto& sendAppend
-						) {
-							if (!connect) {
-								qDebug() << "Processor::availableSlots: connect is null";
-								return;
-							}
-							if (!package->randomFlag()) {
-								qDebug() <<
-									"Processor::availableSlots: when the randomFlag is 0, the reply is not allowed";
-								return;
-							}
-							const auto& sendFileInfo = *static_cast<QFileInfo*>(sendArg.get());
-							if (!sendFileInfo.isFile()) {
-								qDebug() << "Processor::availableSlots: current fileinfo is not file:" <<
-									sendFileInfo.filePath();
-								return;
-							}
-							const auto&& replyReply = connect->replyFile(
-								package->randomFlag(),
-								sendFileInfo,
-								sendAppend
-							);
-							if (!replyReply) {
-								qDebug() << "Processor::availableSlots: replyPayloadData error";
-							}
-						}));
+				)>([](
+					const auto& connect,
+					const auto& package,
+					const auto& sendArg,
+					const auto& sendAppend
+				) {
+					if (!connect) {
+						qDebug() << "Processor::availableSlots: connect is null";
+						return;
+					}
+					if (!package->randomFlag()) {
+						qDebug() <<
+							"Processor::availableSlots: when the randomFlag is 0, the reply is not allowed";
+						return;
+					}
+					const auto& sendFileInfo = *static_cast<QFileInfo*>(sendArg.get());
+					if (!sendFileInfo.isFile()) {
+						qDebug() << "Processor::availableSlots: current fileinfo is not file:" <<
+							sendFileInfo.filePath();
+						return;
+					}
+					const auto&& replyReply = connect->replyFile(
+						package->randomFlag(),
+						sendFileInfo,
+						sendAppend
+					);
+					if (!replyReply) {
+						qDebug() << "Processor::availableSlots: replyPayloadData error";
+					}
+					}));
 			} else if (!method.parameterNames()[1].isEmpty()) {
 				qDebug() << "Processor::availableSlots: Unknow argument:" << currentSum;
 				continue;
@@ -243,14 +246,14 @@ QSet<QString> Processor::availableSlots() {
 					return std::shared_ptr<void>/*NetworkVoidSharedPointer*/(new QVariantMap, &Processor::deleteVariantMap);
 					}));
 				receiveAppendArgumentMaker.reset(
-					new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & receivedAppendArg,
-						const QSharedPointer<Package> & package)>(
-							[](const auto& receivedAppendArg, const auto& package) {
-								(*static_cast<QVariantMap*>(receivedAppendArg.get())) = package->appendData();
-								return QArgument<const QVariantMap&>("const QVariantMap&",
-									*static_cast<const QVariantMap*>(receivedAppendArg.
-										get()));
-							}));
+					new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &receivedAppendArg,
+					const QSharedPointer<Package> &package)>(
+					[](const auto& receivedAppendArg, const auto& package) {
+						(*static_cast<QVariantMap*>(receivedAppendArg.get())) = package->appendData();
+						return QArgument<const QVariantMap&>("const QVariantMap&",
+							*static_cast<const QVariantMap*>(receivedAppendArg.
+							get()));
+					}));
 			} else if (!method.parameterNames()[2].isEmpty()) {
 				qDebug() << "Processor::availableSlots: Unknow argument:" << currentSum;
 				continue;
@@ -264,11 +267,11 @@ QSet<QString> Processor::availableSlots() {
 					return std::shared_ptr<void>/*NetworkVoidSharedPointer*/(new QVariantMap, &Processor::deleteVariantMap);
 					}));
 				sendAppendArgumentMaker.reset(
-					new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ & sendAppendArg)>(
-						[](const auto& sendAppendArg) {
-							return QArgument<QVariantMap&>("QVariantMap&",
-							*static_cast<QVariantMap*>(sendAppendArg.get()));
-						}));
+					new std::function<QGenericArgument(const std::shared_ptr<void>/*NetworkVoidSharedPointer*/ &sendAppendArg)>(
+					[](const auto& sendAppendArg) {
+						return QArgument<QVariantMap&>("QVariantMap&",
+						*static_cast<QVariantMap*>(sendAppendArg.get()));
+					}));
 			} else if (!method.parameterNames()[3].isEmpty()) {
 				qDebug() << "Processor::availableSlots: Unknow argument:" << currentSum;
 				continue;
@@ -277,18 +280,18 @@ QSet<QString> Processor::availableSlots() {
 		onpackageReceivedCallbacks_[methodName] =
 			[
 				this,
-				methodName,
-				receiveArgumentPreparer,
-				receiveArgumentMaker,
-				sendArgumentPreparer,
-				sendArgumentMaker,
-				sendArgumentAnswer,
-				receiveAppendArgumentPreparer,
-				receiveAppendArgumentMaker,
-				sendAppendArgumentPreparer,
-				sendAppendArgumentMaker
+					methodName,
+					receiveArgumentPreparer,
+					receiveArgumentMaker,
+					sendArgumentPreparer,
+					sendArgumentMaker,
+					sendArgumentAnswer,
+					receiveAppendArgumentPreparer,
+					receiveAppendArgumentMaker,
+					sendAppendArgumentPreparer,
+					sendAppendArgumentMaker
 			]
-		(const auto& connect, const auto& package)
+			(const auto& connect, const auto& package)
 		{
 			std::shared_ptr<void>/*NetworkVoidSharedPointer*/ receiveArg;
 			if (receiveArgumentPreparer) {
@@ -322,8 +325,8 @@ QSet<QString> Processor::availableSlots() {
 				((receiveArgumentMaker) ? ((*receiveArgumentMaker)(receiveArg, package)) : (QGenericArgument())),
 				((sendArgumentMaker) ? ((*sendArgumentMaker)(sendArg)) : (QGenericArgument())),
 				((receiveAppendArgumentMaker)
-					? ((*receiveAppendArgumentMaker)(receiveAppendArg, package))
-					: (QGenericArgument())),
+				? ((*receiveAppendArgumentMaker)(receiveAppendArg, package))
+				: (QGenericArgument())),
 				((sendAppendArgumentMaker) ? ((*sendAppendArgumentMaker)(sendAppendArg)) : (QGenericArgument()))
 			);
 			if (!invokeMethodReply) {
@@ -342,8 +345,8 @@ QSet<QString> Processor::availableSlots() {
 	}
 	return availableSlots_;
 }
-bool Processor::handlePackage(const QPointer<Connect>& connect,
-	const QSharedPointer<Package>& package) {
+
+bool Processor::handlePackage(const QPointer<Connect>& connect, const QSharedPointer<Package>& package) {
 	qDebug() << "connect: " << connect;
 	auto currentThreadConnect = connectMapByThread_.find(QThread::currentThread());
 	if (currentThreadConnect == connectMapByThread_.end()) {
@@ -369,11 +372,13 @@ bool Processor::handlePackage(const QPointer<Connect>& connect,
 	*currentThreadConnect = nullptr;
 	return true;
 }
+
 void Processor::setReceivedPossibleThreads(const QSet<QThread*>& threads) {
 	for (const auto& thread : threads) {
 		connectMapByThread_[thread] = nullptr;
 	}
 }
+
 bool Processor::checkMapContains(const QStringList& keys, const QVariantMap& received, QVariantMap& send) {
 	for (const auto& key : keys) {
 		if (!received.contains(key)) {
@@ -382,8 +387,8 @@ bool Processor::checkMapContains(const QStringList& keys, const QVariantMap& rec
 	}
 	return true;
 }
-bool Processor::checkMapContainsAndNot0(const QStringList& keys, const QVariantMap& received,
-	QVariantMap& send) {
+
+bool Processor::checkMapContainsAndNot0(const QStringList& keys, const QVariantMap& received, QVariantMap& send) {
 	for (const auto& key : keys) {
 		if (!received.contains(key) || !received[key].toLongLong()) {
 			NP_FAIL(QString("error: %1 is 0").arg(key));
@@ -391,8 +396,8 @@ bool Processor::checkMapContainsAndNot0(const QStringList& keys, const QVariantM
 	}
 	return true;
 }
-bool Processor::checkMapContainsAndNotEmpty(const QStringList& keys, const QVariantMap& received,
-	QVariantMap& send) {
+
+bool Processor::checkMapContainsAndNotEmpty(const QStringList& keys, const QVariantMap& received, QVariantMap& send) {
 	for (const auto& key : keys) {
 		if (!received.contains(key) || received[key].toString().isEmpty()) {
 			NP_FAIL(QString("error: %1 is empty").arg(key));
@@ -400,8 +405,8 @@ bool Processor::checkMapContainsAndNotEmpty(const QStringList& keys, const QVari
 	}
 	return true;
 }
-bool Processor::checkDataContasinsExpectedContent(const QString& key, const QVariantList& expectedContentList,
-	const QVariantMap& received, QVariantMap& send) {
+
+bool Processor::checkDataContasinsExpectedContent(const QString& key, const QVariantList& expectedContentList, const QVariantMap& received, QVariantMap& send) {
 	if (!checkMapContains({ key }, received, send)) {
 		return false;
 	}
@@ -423,6 +428,7 @@ bool Processor::checkDataContasinsExpectedContent(const QString& key, const QVar
 	}
 	NP_FAIL(message);
 }
+
 QPointer<Connect> Processor::currentThreadConnect() {
 	auto currentThreadConnect = connectMapByThread_.find(QThread::currentThread());
 	if (currentThreadConnect == connectMapByThread_.end()) {
@@ -431,6 +437,7 @@ QPointer<Connect> Processor::currentThreadConnect() {
 	}
 	return *currentThreadConnect;
 }
+
 void Processor::deleteFileInfo(QFileInfo* ptr) {
 	delete ptr;
 }
