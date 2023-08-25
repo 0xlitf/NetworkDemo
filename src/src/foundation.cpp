@@ -56,15 +56,10 @@ NetworkThreadPool::NetworkThreadPool(const int& threadCount) :
 	m_threadPool->setMaxThreadCount(threadCount);
 	m_eventLoops->resize(threadCount);
 	m_helpers->resize(threadCount);
+
 	QSemaphore semaphoreForThreadStart;
 	for (auto index = 0; index < threadCount; ++index) {
-		QtConcurrent::run(
-			m_threadPool.data(),
-			[
-				this,
-				index,
-				&semaphoreForThreadStart
-			]() {
+		QtConcurrent::run(m_threadPool.data(), [this, index, &semaphoreForThreadStart]() {
 				QEventLoop eventLoop;
 				NetworkThreadPoolHelper helper;
 				(*this->m_eventLoops)[index] = &eventLoop;
